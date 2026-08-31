@@ -7,6 +7,7 @@ import argparse
 import csv
 import difflib
 import re
+import shlex
 import sys
 import unicodedata
 import wave
@@ -14,13 +15,18 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-SPEAKER_RE = re.compile(r"^(?P<place>.+)_(?P<kind>[^_]+)_(?P<number>\d+)$")
+RECORDING_RE = re.compile(r"^(?P<place>.+)_(?P<kind>[a-z]+)_(?P<suffix>\d+(?:_\d+)*)$")
 ALIASES = {
     "norra_rorum": "n_rorum",
     "onaset_nysatra": "nysatra",
     "vastra_vingaker": "v_vingaker",
     "v_vingaker": "v_vingaker",
-    "sankt_anna": "s_anna",
+    "sankt_anna": "st_anna",
+    "nrorum": "n_rorum",
+    "sodrafinnskoga": "s_finnskoga",
+    "stanna": "st_anna",
+    "stmellosa": "s_mellosa",
+    "vingaker": "v_vingaker",
 }
 
 
@@ -28,6 +34,19 @@ ALIASES = {
 class ParseResult:
     intervals: list[tuple[float, float, str]]
     warnings: list[str]
+
+
+@dataclass(frozen=True)
+class Recording:
+    path: Path
+    place: str
+    kind: str
+    suffix: tuple[int, ...]
+    source_priority: int
+
+    @property
+    def speaker_id(self) -> str:
+        return f"{self.kind}_{'_'.join(str(part) for part in self.suffix)}"
 
 
 def ascii_name(value: str) -> str:
@@ -51,21 +70,63 @@ def read_places(path: Path) -> list[tuple[str, str]]:
     return rows
 
 
-def recording_parts(path: Path) -> tuple[str, str, int] | None:
-    match = SPEAKER_RE.match(path.stem)
+def read_resource_places(path: Path) -> list[tuple[str, str, str]]:
+    # Tcl-style SweDia resource file: {stem abbr full_name province x y group}
+    text = path.read_bytes().decode("latin-1")
+    rows = []
+    for line_no, raw in enumerate(text.splitlines(), 1):
+        line = raw.strip()
+        if not line.startswith("{") or not line.endswith("}"):
+            continue
+        fields = shlex.split(line[1:-1])
+        if len(fields) < 3:
+            raise ValueError(f"Malformed row in {path} line {line_no}: {raw!r}")
+        rows.append((fields[1], fields[2], fields[0]))
+    return rows
+
+
+def recording_parts(path: Path) -> tuple[str, str, tuple[int, ...]] | None:
+    match = RECORDING_RE.match(path.stem)
     if not match:
         return None
-    return match["place"], match["kind"], int(match["number"])
+    return match["place"], match["kind"], tuple(int(part) for part in match["suffix"].split("_"))
 
 
-def choose_media_stem(place: str, stems: set[str]) -> tuple[str | None, str, float]:
+def existing_dirs(paths: list[Path]) -> list[Path]:
+    return [path for path in paths if path.exists()]
+
+
+def collect_wavs(paths: list[Path]) -> list[Recording]:
+    recordings: dict[str, Recording] = {}
+    for source_priority, directory in enumerate(existing_dirs(paths)):
+        for path in sorted(directory.glob("*.wav")):
+            parts = recording_parts(path)
+            if not parts:
+                continue
+            place, kind, suffix = parts
+            # Keep the first copy according to directory priority.
+            recordings.setdefault(path.stem, Recording(path, place, kind, suffix, source_priority))
+    return sorted(recordings.values(), key=lambda rec: (rec.place, rec.source_priority, rec.kind, rec.suffix, rec.path.name))
+
+
+def collect_annotations(paths: list[Path], extension: str) -> dict[str, Path]:
+    annotations: dict[str, Path] = {}
+    for directory in existing_dirs(paths):
+        for path in sorted(directory.glob(f"*.{extension}")):
+            annotations.setdefault(path.stem, path)
+    return annotations
+
+
+def choose_media_stem(place: str, stems: set[str], hints: list[str] | None = None) -> tuple[str | None, str, float]:
     normalized = ascii_name(place)
-    candidates = [normalized]
+    candidates = [ALIASES.get(ascii_name(hint), ascii_name(hint)) for hint in hints or []]
+    candidates.append(normalized)
     if "_" in normalized:
         candidates.extend([normalized.split("_")[0], normalized.split("_")[-1]])
     alias = ALIASES.get(normalized)
     if alias:
         candidates.insert(0, alias)
+    candidates = list(dict.fromkeys(candidate for candidate in candidates if candidate))
     for candidate in candidates:
         if candidate in stems:
             return candidate, "exact", 1.0
@@ -175,54 +236,193 @@ def write_textgrid(path: Path, duration: float, tiers: list[tuple[str, list[tupl
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--places", type=Path, default=Path("Orter_SweDia.csv"))
-    parser.add_argument("--media", type=Path, default=Path("Media"))
-    parser.add_argument("--annotations", type=Path, default=Path("Annotations"))
-    parser.add_argument("--output", type=Path, default=Path("TextGrids"))
-    parser.add_argument("--summary", type=Path, default=Path("sweDia_inventory.csv"))
-    parser.add_argument("--compact-summary", type=Path, default=Path("sweDia_inventory_compact.tsv"))
-    args = parser.parse_args()
-
-    wavs = sorted(args.media.glob("*.wav"))
-    parsed_wavs = [(path, recording_parts(path)) for path in wavs]
-    stems = {parts[0] for _, parts in parsed_wavs if parts}
-    places = read_places(args.places)
+def build_matches(
+    places: list[tuple[str, str, list[str]]],
+    parsed_wavs: list[Recording],
+    ord_annotations: dict[str, Path],
+    seg_annotations: dict[str, Path],
+    output: Path | None = None,
+) -> tuple[list[dict], int]:
+    stems = {recording.place for recording in parsed_wavs}
     matches = []
     max_speakers = 0
-    args.output.mkdir(parents=True, exist_ok=True)
-
-    for code, place in places:
-        stem, method, score = choose_media_stem(place, stems)
+    for code, place, hints in places:
+        stem, method, score = choose_media_stem(place, stems, hints)
         selected = sorted(
-            ((parts[2], parts[1], path) for path, parts in parsed_wavs if parts and parts[0] == stem),
-            key=lambda item: (item[0], item[1], item[2].name),
+            (recording for recording in parsed_wavs if recording.place == stem),
+            key=lambda recording: (recording.source_priority, recording.suffix, recording.kind, recording.path.name),
         ) if stem else []
+        if selected:
+            best_source_priority = min(recording.source_priority for recording in selected)
+            selected = [recording for recording in selected if recording.source_priority == best_source_priority]
         max_speakers = max(max_speakers, len(selected))
         speakers = []
-        for number, kind, wav in selected:
-            base = wav.stem
-            ord_path = args.annotations / f"{base}.ord"
-            seg_path = args.annotations / f"{base}.seg"
-            duration = wav_duration(wav)
-            tiers = []
+        for wav in selected:
+            base = wav.path.stem
+            ord_path = ord_annotations.get(base)
+            seg_path = seg_annotations.get(base)
             warnings = []
-            for tier_name, annotation in (("ord", ord_path), ("seg", seg_path)):
-                parsed = parse_xwaves(annotation) if annotation.exists() else ParseResult([], [])
-                intervals, extra = contiguous(parsed.intervals, duration)
-                tiers.append((tier_name, intervals))
-                warnings.extend(f"{tier_name}: {warning}" for warning in parsed.warnings + extra)
-            output = args.output / f"{base}.TextGrid"
-            write_textgrid(output, duration, tiers)
+            textgrid_name = ""
+            if output is not None:
+                duration = wav_duration(wav.path)
+                tiers = []
+                for tier_name, annotation in (("ord", ord_path), ("seg", seg_path)):
+                    parsed = parse_xwaves(annotation) if annotation else ParseResult([], [])
+                    intervals, extra = contiguous(parsed.intervals, duration)
+                    tiers.append((tier_name, intervals))
+                    warnings.extend(f"{tier_name}: {warning}" for warning in parsed.warnings + extra)
+                textgrid_name = f"{base}.TextGrid"
+                write_textgrid(output / textgrid_name, duration, tiers)
             speakers.append({
-                "speaker": f"{kind}_{number}", "wav": wav.name,
-                "ord": "yes" if ord_path.exists() else "MISSING",
-                "seg": "yes" if seg_path.exists() else "MISSING",
-                "textgrid": output.name, "warnings": " | ".join(warnings),
+                "speaker": wav.speaker_id, "wav": wav.path.name,
+                "ord": ord_path.name if ord_path else "MISSING",
+                "seg": seg_path.name if seg_path else "MISSING",
+                "textgrid": textgrid_name, "warnings": " | ".join(warnings),
             })
         matches.append({"code": code, "place": place, "stem": stem or "", "method": method,
                         "score": score, "speakers": speakers})
+    return matches, max_speakers
+
+
+def speaker_inventory_value(speaker: dict) -> str:
+    available = ["w"]
+    if speaker["ord"] != "MISSING":
+        available.append("o")
+    if speaker["seg"] != "MISSING":
+        available.append("s")
+    return ",".join(available)
+
+
+def compact_speaker_values(match: dict) -> tuple[dict[int, str], bool]:
+    grouped: dict[int, set[str]] = {}
+    has_partial_recordings = False
+    for speaker in match["speakers"]:
+        parts = speaker["speaker"].split("_")[1:]
+        if not parts:
+            continue
+        speaker_number = int(parts[0])
+        has_partial_recordings = has_partial_recordings or len(parts) > 1
+        available = grouped.setdefault(speaker_number, {"w"})
+        if speaker["ord"] != "MISSING":
+            available.add("o")
+        if speaker["seg"] != "MISSING":
+            available.add("s")
+
+    order = {"w": 0, "o": 1, "s": 2}
+    return {
+        number: ",".join(sorted(values, key=lambda value: order[value]))
+        for number, values in grouped.items()
+    }, has_partial_recordings
+
+
+def status_for_values(values: dict[int, str]) -> str:
+    complete = sum(value == "w,o,s" for value in values.values())
+    if complete >= 3:
+        return "pass"
+    if complete >= 1:
+        return "partial pass"
+    return "non-pass"
+
+
+def status_for_match(match: dict) -> str:
+    values, _ = compact_speaker_values(match)
+    return status_for_values(values)
+
+
+def write_compact_summary(
+    path: Path,
+    matches: list[dict],
+    max_speakers: int,
+    include_status: bool = False,
+    provenance: dict[str, str] | None = None,
+) -> None:
+    compacted = [compact_speaker_values(match) for match in matches]
+    max_speaker_number = max(
+        (number for values, _ in compacted for number in values),
+        default=max(max_speakers, 3),
+    )
+    compact_fields = ["abbr", "full_name"]
+    if include_status:
+        compact_fields.append("status")
+    if provenance is not None:
+        compact_fields.append("provenance")
+    compact_fields += [f"sp{i}" for i in range(1, max(max_speaker_number, 3) + 1)]
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=compact_fields, delimiter="\t")
+        writer.writeheader()
+        for match, (values, has_partial_recordings) in zip(matches, compacted):
+            place = f'{match["place"]}*' if has_partial_recordings else match["place"]
+            row = {"abbr": match["code"], "full_name": place}
+            if include_status:
+                row["status"] = status_for_values(values)
+            if provenance is not None:
+                row["provenance"] = provenance.get(match["code"], "")
+            for number, value in values.items():
+                row[f"sp{number}"] = value
+            writer.writerow(row)
+
+
+def choose_unique_pass_matches(
+    default_matches: list[dict],
+    source_matches: dict[str, list[dict]],
+) -> tuple[list[dict], dict[str, str], int]:
+    source_by_code = {
+        label: {match["code"]: match for match in matches}
+        for label, matches in source_matches.items()
+    }
+    selected = []
+    provenance = {}
+    max_speakers = 0
+    for default_match in default_matches:
+        code = default_match["code"]
+        pass_labels = [
+            label for label, matches_by_code in source_by_code.items()
+            if code in matches_by_code and status_for_match(matches_by_code[code]) == "pass"
+        ]
+        if len(pass_labels) == 1:
+            label = pass_labels[0]
+            match = source_by_code[label][code]
+            provenance[code] = label
+        else:
+            match = default_match
+        selected.append(match)
+        values, _ = compact_speaker_values(match)
+        max_speakers = max(max_speakers, *(values.keys() or [0]))
+    return selected, provenance, max_speakers
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--places", type=Path, default=Path("Orter_SweDia.csv"))
+    parser.add_argument(
+        "--media",
+        type=Path,
+        action="append",
+        default=None,
+        help="Directory with .wav files. Can be repeated. Default: sounds, Media.",
+    )
+    parser.add_argument(
+        "--annotations",
+        type=Path,
+        action="append",
+        default=None,
+        help="Directory with .ord/.seg files. Can be repeated. Default: sannotations, Annotations.",
+    )
+    parser.add_argument("--output", type=Path, default=Path("TextGrids"))
+    parser.add_argument("--summary", type=Path, default=Path("sweDia_inventory.csv"))
+    parser.add_argument("--compact-summary", type=Path, default=Path("sweDia_inventory_compact.tsv"))
+    parser.add_argument("--resource", type=Path, default=Path("resource.txt"))
+    parser.add_argument("--all-compact-summary", type=Path, default=Path("sweDia_inventory_all_compact.tsv"))
+    args = parser.parse_args()
+
+    media_dirs = args.media or [Path("sounds"), Path("Media")]
+    annotation_dirs = args.annotations or [Path("sannotations"), Path("Annotations")]
+    parsed_wavs = collect_wavs(media_dirs)
+    ord_annotations = collect_annotations(annotation_dirs, "ord")
+    seg_annotations = collect_annotations(annotation_dirs, "seg")
+    args.output.mkdir(parents=True, exist_ok=True)
+    places = [(code, place, []) for code, place in read_places(args.places)]
+    matches, max_speakers = build_matches(places, parsed_wavs, ord_annotations, seg_annotations, args.output)
 
     fields = ["code", "village", "matched_stem", "match_method", "match_score", "recording_count"]
     for i in range(1, max_speakers + 1):
@@ -240,28 +440,35 @@ def main() -> int:
                     row[f"speaker_{i}" if key == "speaker" else f"speaker_{i}_{key}"] = value
             writer.writerow(row)
 
-    # A deliberately small, human-scannable inventory. Speaker columns follow
-    # the numeric suffix in names such as asby_ym_2, rather than row position.
-    max_speaker_number = max(
-        (int(speaker["speaker"].rsplit("_", 1)[1])
-         for match in matches for speaker in match["speakers"]),
-        default=3,
-    )
-    compact_fields = ["abbr", "full_name"] + [f"sp{i}" for i in range(1, max_speaker_number + 1)]
-    with args.compact_summary.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=compact_fields, delimiter="\t")
-        writer.writeheader()
-        for match in matches:
-            row = {"abbr": match["code"], "full_name": match["place"]}
-            for speaker in match["speakers"]:
-                number = int(speaker["speaker"].rsplit("_", 1)[1])
-                available = ["w"]
-                if speaker["ord"] == "yes":
-                    available.append("o")
-                if speaker["seg"] == "yes":
-                    available.append("s")
-                row[f"sp{number}"] = ",".join(available)
-            writer.writerow(row)
+    write_compact_summary(args.compact_summary, matches, max_speakers)
+
+    if args.resource.exists():
+        resource_places = [
+            (code, place, [resource_stem]) for code, place, resource_stem in read_resource_places(args.resource)
+        ]
+        all_matches, all_max_speakers = build_matches(
+            resource_places, parsed_wavs, ord_annotations, seg_annotations
+        )
+        pair_matches = {}
+        for label, media_dir, annotation_dir in (
+            ("sounds/sannotations", Path("sounds"), Path("sannotations")),
+            ("Media/Annotations", Path("Media"), Path("Annotations")),
+        ):
+            pair_matches[label], _ = build_matches(
+                resource_places,
+                collect_wavs([media_dir]),
+                collect_annotations([annotation_dir], "ord"),
+                collect_annotations([annotation_dir], "seg"),
+            )
+        all_matches, provenance, provenance_max_speakers = choose_unique_pass_matches(all_matches, pair_matches)
+        all_max_speakers = max(all_max_speakers, provenance_max_speakers)
+        write_compact_summary(
+            args.all_compact_summary,
+            all_matches,
+            all_max_speakers,
+            include_status=True,
+            provenance=provenance,
+        )
 
     generated = sum(len(match["speakers"]) for match in matches)
     missing_places = sum(not match["stem"] for match in matches)
@@ -270,6 +477,8 @@ def main() -> int:
     print(f"Generated {generated} TextGrids in {args.output}")
     print(f"Summary: {args.summary}")
     print(f"Compact summary: {args.compact_summary}")
+    if args.resource.exists():
+        print(f"All-villages compact summary: {args.all_compact_summary}")
     print(f"Unmatched villages: {missing_places}; missing ord: {missing_ord}; missing seg: {missing_seg}")
     return 0
 
