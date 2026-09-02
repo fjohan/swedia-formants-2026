@@ -20,6 +20,7 @@ import sys
 import textwrap
 from argparse import BooleanOptionalAction
 from collections import Counter, defaultdict
+from dataclasses import dataclass
 from pathlib import Path
 
 os.environ.setdefault("MPLCONFIGDIR", "/tmp/swidia-matplotlib")
@@ -29,7 +30,14 @@ import numpy as np
 import parselmouth
 from fasttrackpy import CandidateTracks
 
-from convert_xwaves_to_textgrids import parse_xwaves
+from convert_xwaves_to_textgrids import (
+    build_matches,
+    collect_annotations,
+    collect_wavs,
+    parse_xwaves,
+    read_places,
+    read_resource_places,
+)
 from inventory_base_word_targets import (
     ALTERNATIVE_TARGET_MAP,
     BASE_TARGETS,
@@ -53,6 +61,14 @@ VOWEL_INITIALS = set("aeiouyAEIOUYäöåÄÖÅ29<")
 FRONT_VOWEL_SAFE_TARGETS = {"y:", "e:", "ä:", "ö:"}
 FILE_RE = re.compile(r"^(?P<village>.+)_(?P<speaker_type>[a-z]+)_(?P<speaker_number>\d+)(?:_\d+)*$")
 WORD_VOWELS = set("aeiouyåäöAEIOUYÅÄÖ")
+
+
+@dataclass(frozen=True)
+class RecordingJob:
+    wav_path: Path
+    ord_path: Path
+    seg_path: Path
+    source_pair: str
 
 
 def bark(hz: float) -> float:
@@ -103,6 +119,71 @@ def read_lexical_map(path: Path) -> dict[str, dict[str, str]]:
     if not rows or not required.issubset(rows[0]):
         raise ValueError(f"{path} must contain columns: {', '.join(sorted(required))}")
     return {row["lexical_item"].strip().lower(): row for row in rows}
+
+
+def places_for_scope(scope: str, places_path: Path, resource_path: Path) -> list[tuple[str, str, list[str]]]:
+    if scope == "original":
+        return [(code, place, []) for code, place in read_places(places_path)]
+    if scope == "all":
+        return [
+            (code, place, [resource_stem])
+            for code, place, resource_stem in read_resource_places(resource_path)
+        ]
+    raise ValueError(f"unknown corpus scope: {scope}")
+
+
+def source_pairs(mode: str, media: Path, annotations: Path) -> list[tuple[str, Path, Path]]:
+    pairs = {
+        "media_annotations": [("Media/Annotations", Path("Media"), Path("Annotations"))],
+        "sounds_sannotations": [("sounds/sannotations", Path("sounds"), Path("sannotations"))],
+        "both": [
+            ("Media/Annotations", Path("Media"), Path("Annotations")),
+            ("sounds/sannotations", Path("sounds"), Path("sannotations")),
+        ],
+        "custom": [(f"{media}/{annotations}", media, annotations)],
+    }
+    if mode not in pairs:
+        raise ValueError(f"unknown source mode: {mode}")
+    return pairs[mode]
+
+
+def corpus_jobs(scope: str, source_mode: str, places_path: Path, resource_path: Path,
+                media: Path, annotations: Path) -> list[RecordingJob]:
+    places = places_for_scope(scope, places_path, resource_path)
+    jobs: dict[tuple[str, str], RecordingJob] = {}
+    for label, media_dir, annotation_dir in source_pairs(source_mode, media, annotations):
+        matches, _ = build_matches(
+            places,
+            collect_wavs([media_dir]),
+            collect_annotations([annotation_dir], "ord"),
+            collect_annotations([annotation_dir], "seg"),
+        )
+        for match in matches:
+            for speaker in match["speakers"]:
+                if speaker["ord"] == "MISSING" or speaker["seg"] == "MISSING":
+                    continue
+                wav_path = media_dir / speaker["wav"]
+                ord_path = annotation_dir / speaker["ord"]
+                seg_path = annotation_dir / speaker["seg"]
+                if not (wav_path.exists() and ord_path.exists() and seg_path.exists()):
+                    continue
+                jobs[(label, wav_path.stem)] = RecordingJob(wav_path, ord_path, seg_path, label)
+    return sorted(jobs.values(), key=lambda job: (job.wav_path.stem, job.source_pair))
+
+
+def glob_jobs(media: Path, annotations: Path, patterns: str) -> list[RecordingJob]:
+    globs = [item.strip() for item in patterns.split(",") if item.strip()]
+    wavs = sorted({path for glob in globs for path in media.glob(f"{glob}.wav")})
+    jobs = []
+    for wav_path in wavs:
+        ord_path = annotations / f"{wav_path.stem}.ord"
+        seg_path = annotations / f"{wav_path.stem}.seg"
+        jobs.append(RecordingJob(wav_path, ord_path, seg_path, f"{media}/{annotations}"))
+    return jobs
+
+
+def source_slug(source_pair: str) -> str:
+    return re.sub(r"[^A-Za-z0-9]+", "_", source_pair).strip("_").lower() or "source"
 
 
 def inventory_lexical_map() -> dict[str, dict]:
@@ -223,6 +304,7 @@ def select_one_word_per_vowel(tokens: list[dict]) -> tuple[list[dict], list[dict
         selected_tokens.extend(selected_values)
         selection_rows.append({
             "recording": selected_values[0]["recording"],
+            "source_pair": selected_values[0].get("source_pair", ""),
             "village": selected_values[0]["village"],
             "speaker": selected_values[0]["speaker"],
             "selection_status": "selected",
@@ -243,6 +325,7 @@ def select_one_word_per_vowel(tokens: list[dict]) -> tuple[list[dict], list[dict
                 continue
             selection_rows.append({
                 "recording": first["recording"],
+                "source_pair": first.get("source_pair", ""),
                 "village": first["village"],
                 "speaker": first["speaker"],
                 "selection_status": "missing",
@@ -385,6 +468,26 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--media", type=Path, default=Path("Media"))
     parser.add_argument("--annotations", type=Path, default=Path("Annotations"))
+    parser.add_argument("--places", type=Path, default=Path("Orter_SweDia.csv"))
+    parser.add_argument("--resource", type=Path, default=Path("resource.txt"))
+    parser.add_argument(
+        "--corpus-scope",
+        choices=["recordings", "original", "all"],
+        default="recordings",
+        help=(
+            "recordings uses --media/--annotations/--recordings; original restricts to "
+            "Orter_SweDia.csv; all uses all villages in resource.txt."
+        ),
+    )
+    parser.add_argument(
+        "--source-mode",
+        choices=["custom", "media_annotations", "sounds_sannotations", "both"],
+        default="custom",
+        help=(
+            "Source directories for --corpus-scope original/all. both includes complete "
+            "recordings from both Media/Annotations and sounds/sannotations."
+        ),
+    )
     parser.add_argument("--lexical-map", type=Path, default=Path("lexical_vowel_targets.tsv"))
     parser.add_argument(
         "--target-source",
@@ -489,12 +592,16 @@ def main() -> int:
     if not 0 <= args.window_start < args.window_end <= 1:
         parser.error("measurement window fractions must satisfy 0 <= start < end <= 1")
 
-    globs = [item.strip() for item in args.recordings.split(",") if item.strip()]
-    wavs = sorted({path for glob in globs for path in args.media.glob(f"{glob}.wav")})
+    if args.corpus_scope == "recordings":
+        jobs = glob_jobs(args.media, args.annotations, args.recordings)
+    else:
+        if args.source_mode == "custom":
+            parser.error("--source-mode must be media_annotations, sounds_sannotations, or both with --corpus-scope original/all")
+        jobs = corpus_jobs(args.corpus_scope, args.source_mode, args.places, args.resource, args.media, args.annotations)
     if args.max_recordings:
-        wavs = wavs[:args.max_recordings]
-    if not wavs:
-        parser.error("no recordings matched --recordings")
+        jobs = jobs[:args.max_recordings]
+    if not jobs:
+        parser.error("no recordings matched the requested scope")
 
     args.output.mkdir(parents=True, exist_ok=True)
     plot_dir = args.output / "diagnostics"
@@ -504,12 +611,18 @@ def main() -> int:
     errors: list[dict] = []
     word_selection_rows: list[dict] = []
     total = 0
+    stem_counts = Counter(job.wav_path.stem for job in jobs)
 
-    for wav_no, wav_path in enumerate(wavs, 1):
-        seg_path = args.annotations / f"{wav_path.stem}.seg"
-        ord_path = args.annotations / f"{wav_path.stem}.ord"
+    for wav_no, job in enumerate(jobs, 1):
+        wav_path = job.wav_path
+        token_prefix = (
+            wav_path.stem if stem_counts[wav_path.stem] == 1
+            else f"{source_slug(job.source_pair)}_{wav_path.stem}"
+        )
+        seg_path = job.seg_path
+        ord_path = job.ord_path
         if not seg_path.exists() or not ord_path.exists():
-            print(f"[{wav_no}/{len(wavs)}] skip {wav_path.stem}: missing ord or seg", file=sys.stderr)
+            print(f"[{wav_no}/{len(jobs)}] skip {wav_path.stem}: missing ord or seg", file=sys.stderr)
             continue
         parts = FILE_RE.match(wav_path.stem)
         sound = parselmouth.Sound(str(wav_path))
@@ -529,7 +642,8 @@ def main() -> int:
             segment = vowel_in_word(word_start, word_end, all_segments)
             if segment is None:
                 errors.append({
-                    "token_id": f"{wav_path.stem}_unmeasured", "recording": wav_path.stem,
+                    "token_id": f"{token_prefix}_unmeasured", "recording": wav_path.stem,
+                    "source_pair": job.source_pair,
                     "target_label": mapping["target_label"], "ipa": mapping["ipa"], "word": word,
                     "word_start_s": word_start, "word_end_s": word_end,
                     "error_type": "MissingVowelSegment", "error": "no vowel-like seg interval inside word",
@@ -542,7 +656,8 @@ def main() -> int:
             )
             if surface_target_status == "unexpected_surface":
                 errors.append({
-                    "token_id": f"{wav_path.stem}_unmeasured", "recording": wav_path.stem,
+                    "token_id": f"{token_prefix}_unmeasured", "recording": wav_path.stem,
+                    "source_pair": job.source_pair,
                     "target_label": target_label, "ipa": target_ipa, "surface_seg_label": seg_label,
                     "word": word, "word_start_s": word_start, "word_end_s": word_end,
                     "start_s": start, "end_s": end,
@@ -552,6 +667,7 @@ def main() -> int:
             duration = end - start
             parts_dict = {
                 "recording": wav_path.stem,
+                "source_pair": job.source_pair,
                 "village": parts["village"] if parts else "",
                 "speaker": f'{parts["speaker_type"]}_{parts["speaker_number"]}' if parts else "",
             }
@@ -580,7 +696,7 @@ def main() -> int:
                     kept.append(token)
                     count[target] += 1
             lexical_tokens = kept
-        print(f"[{wav_no}/{len(wavs)}] {wav_path.stem}: {len(lexical_tokens)} lexical target tokens")
+        print(f"[{wav_no}/{len(jobs)}] {wav_path.stem}: {len(lexical_tokens)} lexical target tokens")
 
         for token_no, token in enumerate(lexical_tokens, 1):
             if args.limit_total and total >= args.limit_total:
@@ -591,7 +707,7 @@ def main() -> int:
             start, end = token["start_s"], token["end_s"]
             seg_label = token["surface_seg_label"]
             target_label, target_ipa = token["target_label"], token["ipa"]
-            token_id = f"{wav_path.stem}_{token_no:04d}_{target_label.replace(':', 'L')}"
+            token_id = f"{token_prefix}_{token_no:04d}_{target_label.replace(':', 'L')}"
             duration = token["duration_s"]
             measure_start = start + args.window_start * duration
             measure_end = start + args.window_end * duration
@@ -600,6 +716,7 @@ def main() -> int:
             clip = sound.extract_part(clip_start, clip_end, preserve_times=True)
             base = {
                 "token_id": token_id, "recording": wav_path.stem,
+                "source_pair": token.get("source_pair", ""),
                 "village": token["village"],
                 "speaker": token["speaker"],
                 "target_label": target_label, "ipa": target_ipa,
@@ -676,7 +793,7 @@ def main() -> int:
             break
 
     token_fields = [
-        "token_id", "recording", "village", "speaker", "target_label", "ipa",
+        "token_id", "recording", "source_pair", "village", "speaker", "target_label", "ipa",
         "surface_seg_label", "surface_target_status", "surface_target_note",
         "word", "word_normalized", "post_vowel_r", "word_start_s", "word_end_s",
         "start_s", "end_s", "duration_s", "measure_start_s", "measure_end_s",
@@ -708,18 +825,18 @@ def main() -> int:
     write_rows(
         args.output / "word_selection.csv",
         [
-            "recording", "village", "speaker", "selection_status", "target_label", "ipa",
+            "recording", "source_pair", "village", "speaker", "selection_status", "target_label", "ipa",
             "selected_word", "selected_word_normalized",
             "selected_token_count", "selected_median_duration_s", "candidate_words",
         ],
         word_selection_rows,
     )
-    track_fields = ["token_id", "recording", "village", "speaker", "target_label", "ipa",
+    track_fields = ["token_id", "recording", "source_pair", "village", "speaker", "target_label", "ipa",
                     "surface_seg_label", "surface_target_status", "surface_target_note", "word",
                     "start_s", "end_s", "method", "time_s", "relative_time", "f1_hz", "f2_hz"]
     write_rows(args.output / "formant_tracks.csv", track_fields, track_rows)
     write_rows(args.output / "errors.csv",
-               ["token_id", "recording", "target_label", "ipa", "surface_seg_label", "word",
+               ["token_id", "recording", "source_pair", "target_label", "ipa", "surface_seg_label", "word",
                 "word_start_s", "word_end_s", "start_s", "end_s", "error_type", "error"],
                errors)
     plot_spaces = ["hz", "bark"] if args.plot_space == "both" else [args.plot_space]
