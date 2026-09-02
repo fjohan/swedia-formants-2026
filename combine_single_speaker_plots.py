@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import argparse
+import csv
+import json
 import subprocess
 import sys
 from argparse import BooleanOptionalAction
@@ -76,10 +78,47 @@ def run_command(command: list[str]) -> None:
     subprocess.run(command, check=True)
 
 
+def formant_run_current(formant_dir: Path) -> bool:
+    token_path = formant_dir / "token_comparison.csv"
+    settings_path = formant_dir / "run_settings.json"
+    if not token_path.exists() or not settings_path.exists():
+        return False
+    try:
+        settings = json.loads(settings_path.read_text(encoding="utf-8"))
+        if settings.get("target_source") != "inventory":
+            return False
+        if settings.get("surface_target_mode") != "allowed":
+            return False
+        with token_path.open(encoding="utf-8", newline="") as handle:
+            reader = csv.reader(handle)
+            header = next(reader, [])
+    except (OSError, json.JSONDecodeError):
+        return False
+    required = {"surface_target_status", "surface_target_note"}
+    return required.issubset(header)
+
+
+def ellipse_run_current(formant_dir: Path, ellipse_dir: Path, recording_id: str) -> bool:
+    ellipse_path = ellipse_dir / f"{recording_id}_ellipse_fit.png"
+    medians_path = ellipse_dir / "recording_vowel_medians.csv"
+    token_path = formant_dir / "token_comparison.csv"
+    if not ellipse_path.exists() or not medians_path.exists():
+        return False
+    if token_path.exists() and token_path.stat().st_mtime > ellipse_path.stat().st_mtime:
+        return False
+    try:
+        with medians_path.open(encoding="utf-8", newline="") as handle:
+            reader = csv.reader(handle)
+            header = next(reader, [])
+    except OSError:
+        return False
+    return "surface_target_notes" in header
+
+
 def ensure_formant_run(args: argparse.Namespace, formant_dir: Path) -> None:
     tracker_path = formant_dir / TRACKER_PLOTS[(args.tracker, args.space)]
     token_path = formant_dir / "token_comparison.csv"
-    if token_path.exists() and tracker_path.exists() and not args.force:
+    if token_path.exists() and tracker_path.exists() and formant_run_current(formant_dir) and not args.force:
         return
     command = [
         sys.executable,
@@ -87,6 +126,8 @@ def ensure_formant_run(args: argparse.Namespace, formant_dir: Path) -> None:
         "--media", str(args.media),
         "--annotations", str(args.annotations),
         "--recordings", args.id,
+        "--target-source", "inventory",
+        "--surface-target-mode", "allowed",
         "--plots", args.token_plots,
         "--plot-space", args.space,
         "--output", str(formant_dir),
@@ -100,7 +141,7 @@ def ensure_formant_run(args: argparse.Namespace, formant_dir: Path) -> None:
 
 def ensure_ellipse_run(args: argparse.Namespace, formant_dir: Path, ellipse_dir: Path) -> None:
     ellipse_path = ellipse_dir / f"{args.id}_ellipse_fit.png"
-    if ellipse_path.exists() and not args.force:
+    if ellipse_path.exists() and ellipse_run_current(formant_dir, ellipse_dir, args.id) and not args.force:
         return
     command = [
         sys.executable,

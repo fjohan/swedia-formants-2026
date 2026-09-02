@@ -17,6 +17,7 @@ import math
 import os
 import re
 import sys
+import textwrap
 from argparse import BooleanOptionalAction
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -29,17 +30,24 @@ import parselmouth
 from fasttrackpy import CandidateTracks
 
 from convert_xwaves_to_textgrids import parse_xwaves
+from inventory_base_word_targets import (
+    ALTERNATIVE_TARGET_MAP,
+    BASE_TARGETS,
+    EXTRA_COUNTS,
+    allowed_surface_target,
+    second_lat_window,
+)
 
 
 VOWELS = {
-    "u:": "uː",
-    "o:": "oː",
-    "A:": "ɑː",
-    "ä:": "æː",
-    "e:": "eː",
-    "y:": "yː",
-    "U:": "ʉ̟ː",
-    "ö:": "øː",
+    "u:": "u:",
+    "o:": "o:",
+    "A:": "ɑ:",
+    "ä:": "æ:",
+    "e:": "e:",
+    "y:": "y:",
+    "U:": "ʉ̟:",
+    "ö:": "ø:",
 }
 VOWEL_INITIALS = set("aeiouyAEIOUYäöåÄÖÅ29<")
 FRONT_VOWEL_SAFE_TARGETS = {"y:", "e:", "ä:", "ö:"}
@@ -97,6 +105,83 @@ def read_lexical_map(path: Path) -> dict[str, dict[str, str]]:
     return {row["lexical_item"].strip().lower(): row for row in rows}
 
 
+def inventory_lexical_map() -> dict[str, dict]:
+    """Return the curated word inventory used for current vowel analysis.
+
+    The generated inventory TSV is intentionally not read here.  The word list
+    and accepted surface-label exceptions come from inventory_base_word_targets.py
+    so the counting and formant scripts stay in sync.
+    """
+    alternative_to_base = {
+        alternative: base
+        for base, alternatives in ALTERNATIVE_TARGET_MAP.items()
+        for alternative in alternatives
+    }
+    rows: dict[str, dict] = {}
+    for target in BASE_TARGETS:
+        label = target["target"]
+        rows[normalized_word(target["word"])] = {
+            "lexical_item": target["word"],
+            "target_label": label,
+            "ipa": VOWELS[label],
+            "expected_seg_label": target["seg"],
+            "inventory_target": target,
+            "inventory_role": "base",
+        }
+    for target in EXTRA_COUNTS:
+        if target.get("group") != "alternative":
+            continue
+        label = alternative_to_base[target["target"]]
+        rows[normalized_word(target["word"])] = {
+            "lexical_item": target["word"],
+            "target_label": label,
+            "ipa": VOWELS[label],
+            "expected_seg_label": target["seg"],
+            "inventory_target": target,
+            "inventory_role": "alternative",
+        }
+    return rows
+
+
+def surface_status(word: str, mapping: dict, seg_label: str, mode: str) -> tuple[str, str]:
+    expected = mapping.get("expected_seg_label", "")
+    if not expected or mode == "any":
+        if expected and seg_label != expected and allowed_surface_target(word, mapping["inventory_target"], seg_label, True):
+            return "allowed_surface", f"{word}:{seg_label} as /{mapping['ipa']}/"
+        return "not_checked", ""
+    if seg_label == expected:
+        return "canonical", ""
+    if allowed_surface_target(word, mapping["inventory_target"], seg_label, True):
+        return "allowed_surface", f"{word}:{seg_label} as /{mapping['ipa']}/"
+    return "unexpected_surface", f"{word}:{seg_label} != {expected} for /{mapping['ipa']}/"
+
+
+def surface_note_summary(rows: list[dict], max_items: int = 8) -> str:
+    counts = Counter(
+        row.get("surface_target_note", "")
+        for row in rows
+        if row.get("surface_target_status") == "allowed_surface" and row.get("surface_target_note")
+    )
+    if not counts:
+        return ""
+    items = [f"{note} ({count})" for note, count in counts.most_common(max_items)]
+    suffix = "; ..." if len(counts) > max_items else ""
+    return "Allowed surface targets: " + "; ".join(items) + suffix
+
+
+def missing_target_summary(rows: list[dict]) -> str:
+    present = {row["target_label"] for row in rows}
+    missing = [f"/{ipa}/" for label, ipa in VOWELS.items() if label not in present]
+    return "Incomplete target set: missing " + ", ".join(missing) if missing else ""
+
+
+def wrapped_note(text: str, width: int = 115) -> str:
+    lines: list[str] = []
+    for line in text.splitlines():
+        lines.extend(textwrap.wrap(line, width=width) or [""])
+    return "\n".join(lines)
+
+
 def looks_vowel_like(label: str) -> bool:
     return bool(label) and (label[0] in VOWEL_INITIALS or label.startswith("\\}"))
 
@@ -140,6 +225,7 @@ def select_one_word_per_vowel(tokens: list[dict]) -> tuple[list[dict], list[dict
             "recording": selected_values[0]["recording"],
             "village": selected_values[0]["village"],
             "speaker": selected_values[0]["speaker"],
+            "selection_status": "selected",
             "target_label": target_label,
             "ipa": selected_values[0]["ipa"],
             "selected_word": selected_values[0]["word"],
@@ -150,6 +236,24 @@ def select_one_word_per_vowel(tokens: list[dict]) -> tuple[list[dict], list[dict
                 f"{values[0]['word']}:{len(values)}" for _, values in sorted(by_word.items())
             ),
         })
+    if tokens:
+        first = tokens[0]
+        for target_label in VOWELS:
+            if target_label in grouped:
+                continue
+            selection_rows.append({
+                "recording": first["recording"],
+                "village": first["village"],
+                "speaker": first["speaker"],
+                "selection_status": "missing",
+                "target_label": target_label,
+                "ipa": VOWELS[target_label],
+                "selected_word": "",
+                "selected_word_normalized": "",
+                "selected_token_count": 0,
+                "selected_median_duration_s": "",
+                "candidate_words": "",
+            })
     return sorted(selected_tokens, key=lambda token: (token["word_start_s"], token["word_end_s"], token["target_label"])), selection_rows
 
 
@@ -233,7 +337,7 @@ def save_run_plots(output: Path, rows: list[dict], spaces: list[str], show_words
         fig.savefig(output / f"method_agreement{suffix}.png", dpi=150)
         plt.close(fig)
 
-        fig, ax = plt.subplots(figsize=(7, 6), constrained_layout=True)
+        fig, ax = plt.subplots(figsize=(7, 6.8))
         for row in space_rows:
             color = colors[row["target_label"]]
             p = (float(row[f"praat_f2_{space}"]), float(row[f"praat_f1_{space}"]))
@@ -258,6 +362,21 @@ def save_run_plots(output: Path, rows: list[dict], spaces: list[str], show_words
         ax.invert_yaxis()
         ax.set(xlabel=f"F2 ({unit})", ylabel=f"F1 ({unit})",
                title=f"Tracker comparison: Praat ○, Fast Track × ({unit})")
+        notes = [note for note in (missing_target_summary(space_rows), surface_note_summary(space_rows)) if note]
+        if notes:
+            fig.text(
+                0.02,
+                0.02,
+                wrapped_note("\n".join(notes)),
+                ha="left",
+                va="bottom",
+                fontsize=7.5,
+                color="#333333",
+                bbox={"boxstyle": "round,pad=0.25", "facecolor": "#fff7bc", "edgecolor": "#fec44f", "alpha": 0.9},
+            )
+            fig.tight_layout(rect=(0.0, 0.18, 1.0, 1.0))
+        else:
+            fig.tight_layout()
         fig.savefig(output / f"vowel_space_comparison{suffix}.png", dpi=150)
         plt.close(fig)
 
@@ -267,6 +386,25 @@ def main() -> int:
     parser.add_argument("--media", type=Path, default=Path("Media"))
     parser.add_argument("--annotations", type=Path, default=Path("Annotations"))
     parser.add_argument("--lexical-map", type=Path, default=Path("lexical_vowel_targets.tsv"))
+    parser.add_argument(
+        "--target-source",
+        choices=["inventory", "lexical-map"],
+        default="inventory",
+        help=(
+            "inventory uses the curated base/alternative word set coded in the scripts. "
+            "lexical-map restores the older broad TSV-driven target list."
+        ),
+    )
+    parser.add_argument(
+        "--surface-target-mode",
+        choices=["allowed", "canonical", "any"],
+        default="allowed",
+        help=(
+            "Surface .seg label handling for inventory targets: allowed accepts canonical labels "
+            "plus the coded allowed alternatives; canonical accepts only canonical labels; any "
+            "keeps legacy behavior and only annotates known alternatives."
+        ),
+    )
     parser.add_argument("--output", type=Path, default=Path("FormantComparison"))
     parser.add_argument("--recordings", default="*", help="Comma-separated stem globs")
     parser.add_argument("--max-recordings", type=int, default=0, help="0 means all")
@@ -341,7 +479,12 @@ def main() -> int:
             args.fast_max_ceiling = 6500.0
         if args.fast_steps is None:
             args.fast_steps = 14
-    lexical_map = read_lexical_map(args.lexical_map)
+    if args.target_source == "inventory":
+        lexical_map = inventory_lexical_map()
+    else:
+        lexical_map = read_lexical_map(args.lexical_map)
+        if args.surface_target_mode != "any":
+            parser.error("--surface-target-mode must be any when --target-source lexical-map is used")
 
     if not 0 <= args.window_start < args.window_end <= 1:
         parser.error("measurement window fractions must satisfy 0 <= start < end <= 1")
@@ -372,11 +515,17 @@ def main() -> int:
         sound = parselmouth.Sound(str(wav_path))
         all_segments = parse_xwaves(seg_path).intervals
         words = parse_xwaves(ord_path).intervals
+        second_låt = second_lat_window(words) if args.target_source == "inventory" else None
         lexical_tokens = []
         for word_start, word_end, word in words:
-            mapping = lexical_map.get(word.strip().lower())
+            word_key = normalized_word(word)
+            mapping = lexical_map.get(word_key)
             if not mapping:
                 continue
+            if args.target_source == "inventory" and word_key == "låt" and second_låt is not None:
+                midpoint = (word_start + word_end) / 2
+                if second_låt[0] <= midpoint <= second_låt[1]:
+                    continue
             segment = vowel_in_word(word_start, word_end, all_segments)
             if segment is None:
                 errors.append({
@@ -388,6 +537,18 @@ def main() -> int:
                 continue
             start, end, seg_label = segment
             target_label, target_ipa = mapping["target_label"], mapping["ipa"]
+            surface_target_status, surface_target_note = surface_status(
+                word, mapping, seg_label, args.surface_target_mode
+            )
+            if surface_target_status == "unexpected_surface":
+                errors.append({
+                    "token_id": f"{wav_path.stem}_unmeasured", "recording": wav_path.stem,
+                    "target_label": target_label, "ipa": target_ipa, "surface_seg_label": seg_label,
+                    "word": word, "word_start_s": word_start, "word_end_s": word_end,
+                    "start_s": start, "end_s": end,
+                    "error_type": "UnexpectedSurfaceTarget", "error": surface_target_note,
+                })
+                continue
             duration = end - start
             parts_dict = {
                 "recording": wav_path.stem,
@@ -402,6 +563,8 @@ def main() -> int:
                 "mapping": mapping,
                 "target_label": target_label, "ipa": target_ipa,
                 "surface_seg_label": seg_label,
+                "surface_target_status": surface_target_status,
+                "surface_target_note": surface_target_note,
                 "start_s": start, "end_s": end, "duration_s": duration,
             })
         if args.avoid_post_vowel_r:
@@ -443,6 +606,8 @@ def main() -> int:
                 "surface_seg_label": seg_label, "word": word,
                 "word_normalized": token["word_normalized"],
                 "post_vowel_r": token["post_vowel_r"],
+                "surface_target_status": token.get("surface_target_status", ""),
+                "surface_target_note": token.get("surface_target_note", ""),
                 "word_start_s": word_start, "word_end_s": word_end,
                 "start_s": start, "end_s": end, "duration_s": duration,
                 "measure_start_s": measure_start, "measure_end_s": measure_end,
@@ -502,6 +667,7 @@ def main() -> int:
                     save_plot(plot_dir / f"{token_id}.png", clip, start, end,
                               measure_start, measure_end, praat, fast,
                               f"{wav_path.stem}  {word}  /{target_ipa}/ [{seg_label}]  "
+                              f"{token.get('surface_target_note', '')}  "
                               f"Praat {p_f1:.0f}/{p_f2:.0f}, Fast Track {f_f1:.0f}/{f_f2:.0f} Hz")
             except Exception as error:  # Keep a corpus run going and make failures auditable.
                 errors.append(base | {"error_type": type(error).__name__, "error": str(error)})
@@ -511,7 +677,8 @@ def main() -> int:
 
     token_fields = [
         "token_id", "recording", "village", "speaker", "target_label", "ipa",
-        "surface_seg_label", "word", "word_normalized", "post_vowel_r", "word_start_s", "word_end_s",
+        "surface_seg_label", "surface_target_status", "surface_target_note",
+        "word", "word_normalized", "post_vowel_r", "word_start_s", "word_end_s",
         "start_s", "end_s", "duration_s", "measure_start_s", "measure_end_s",
         "praat_ceiling_hz", "fasttrack_ceiling_hz", "fasttrack_candidate",
         "praat_f1_hz", "praat_f2_hz", "fasttrack_f1_hz", "fasttrack_f2_hz",
@@ -520,28 +687,35 @@ def main() -> int:
     ]
     write_rows(args.output / "token_comparison.csv", token_fields, token_rows)
     mapping_counts = Counter(
-        (row["target_label"], row["ipa"], row["word"], row["surface_seg_label"])
+        (
+            row["target_label"], row["ipa"], row["word"], row["surface_seg_label"],
+            row.get("surface_target_status", ""), row.get("surface_target_note", ""),
+        )
         for row in token_rows
     )
     mapping_rows = [
         {"target_label": key[0], "ipa": key[1], "lexical_item": key[2],
-         "surface_seg_label": key[3], "token_count": count}
+         "surface_seg_label": key[3], "surface_target_status": key[4],
+         "surface_target_note": key[5], "token_count": count}
         for key, count in sorted(mapping_counts.items())
     ]
     write_rows(args.output / "surface_label_mapping.csv",
-               ["target_label", "ipa", "lexical_item", "surface_seg_label", "token_count"],
+               [
+                   "target_label", "ipa", "lexical_item", "surface_seg_label",
+                   "surface_target_status", "surface_target_note", "token_count",
+               ],
                mapping_rows)
     write_rows(
         args.output / "word_selection.csv",
         [
-            "recording", "village", "speaker", "target_label", "ipa",
+            "recording", "village", "speaker", "selection_status", "target_label", "ipa",
             "selected_word", "selected_word_normalized",
             "selected_token_count", "selected_median_duration_s", "candidate_words",
         ],
         word_selection_rows,
     )
     track_fields = ["token_id", "recording", "village", "speaker", "target_label", "ipa",
-                    "surface_seg_label", "word",
+                    "surface_seg_label", "surface_target_status", "surface_target_note", "word",
                     "start_s", "end_s", "method", "time_s", "relative_time", "f1_hz", "f2_hz"]
     write_rows(args.output / "formant_tracks.csv", track_fields, track_rows)
     write_rows(args.output / "errors.csv",

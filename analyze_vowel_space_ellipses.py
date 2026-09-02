@@ -9,6 +9,7 @@ import math
 import os
 import shlex
 import tempfile
+import textwrap
 from collections import defaultdict
 from pathlib import Path
 
@@ -31,6 +32,7 @@ VOWEL_IPA = {
     "U:": "ʉ̟:",
     "ö:": "ø:",
 }
+WORD_VOWELS = set("aeiouyåäöAEIOUYÅÄÖ")
 
 
 def vowel_label(vowel: str) -> str:
@@ -60,14 +62,33 @@ def parse_float(value: str) -> float:
 
 
 def has_r_context(row: dict) -> bool:
-    """Word-level r-context filter.
+    """Return true when r/R occurs after the first vowel letter in the word."""
+    folded = row.get("word", "").casefold()
+    first_vowel = next((idx for idx, char in enumerate(folded) if char in WORD_VOWELS), None)
+    return first_vowel is not None and "r" in folded[first_vowel + 1:]
 
-    The token table currently contains lexical words, not parsed consonant
-    environments. Treat any lexical item containing r/R as r-context. This is
-    deliberately broad: it excludes clear pre-r targets such as lär/dör/stör/rör,
-    while also making the filtering auditable in the downstream CSVs.
-    """
-    return "r" in row.get("word", "").casefold()
+
+def aggregate_surface_notes(rows: list[dict], max_items: int = 8) -> str:
+    notes = defaultdict(int)
+    for row in rows:
+        note = row.get("surface_target_note", "")
+        if row.get("surface_target_status") == "allowed_surface" and note:
+            notes[note] += 1
+            continue
+        note = row.get("surface_target_notes", "")
+        if note:
+            notes[note] += 1
+    items = sorted(notes.items(), key=lambda item: (-item[1], item[0]))
+    if len(items) > max_items:
+        items = items[:max_items] + [("...", 0)]
+    return "; ".join(f"{note} ({count})" if count else note for note, count in items)
+
+
+def wrapped_note(text: str, width: int = 115) -> str:
+    lines: list[str] = []
+    for line in text.splitlines():
+        lines.extend(textwrap.wrap(line, width=width) or [""])
+    return "\n".join(lines)
 
 
 def read_tokens(path: Path, method: str, space: str, context_mode: str = "all") -> list[dict]:
@@ -96,9 +117,9 @@ def read_tokens(path: Path, method: str, space: str, context_mode: str = "all") 
 
 
 def speaker_category_medians(tokens: list[dict]) -> list[dict]:
-    grouped: dict[tuple[str, str, str], list[tuple[float, float]]] = defaultdict(list)
+    grouped: dict[tuple[str, str, str], list[dict]] = defaultdict(list)
     for row in tokens:
-        grouped[(row["village"], row["speaker"], row["target_label"])].append((row["f1"], row["f2"]))
+        grouped[(row["village"], row["speaker"], row["target_label"])].append(row)
 
     rows = []
     for (village, speaker, vowel), values in sorted(grouped.items()):
@@ -108,8 +129,9 @@ def speaker_category_medians(tokens: list[dict]) -> list[dict]:
             "target_label": vowel,
             "ipa": VOWEL_IPA[vowel],
             "n_tokens": len(values),
-            "f1": finite_median([value[0] for value in values]),
-            "f2": finite_median([value[1] for value in values]),
+            "f1": finite_median([row["f1"] for row in values]),
+            "f2": finite_median([row["f2"] for row in values]),
+            "surface_target_notes": aggregate_surface_notes(values),
         })
     return rows
 
@@ -129,14 +151,15 @@ def village_category_medians(speaker_rows: list[dict]) -> list[dict]:
             "n_tokens": sum(int(row["n_tokens"]) for row in values),
             "f1": finite_median([row["f1"] for row in values]),
             "f2": finite_median([row["f2"] for row in values]),
+            "surface_target_notes": aggregate_surface_notes(values),
         })
     return rows
 
 
 def recording_category_medians(tokens: list[dict]) -> list[dict]:
-    grouped: dict[tuple[str, str, str, str], list[tuple[float, float]]] = defaultdict(list)
+    grouped: dict[tuple[str, str, str, str], list[dict]] = defaultdict(list)
     for row in tokens:
-        grouped[(row["recording"], row["village"], row["speaker"], row["target_label"])].append((row["f1"], row["f2"]))
+        grouped[(row["recording"], row["village"], row["speaker"], row["target_label"])].append(row)
 
     rows = []
     for (recording, village, speaker, vowel), values in sorted(grouped.items()):
@@ -147,8 +170,9 @@ def recording_category_medians(tokens: list[dict]) -> list[dict]:
             "target_label": vowel,
             "ipa": VOWEL_IPA[vowel],
             "n_tokens": len(values),
-            "f1": finite_median([value[0] for value in values]),
-            "f2": finite_median([value[1] for value in values]),
+            "f1": finite_median([row["f1"] for row in values]),
+            "f2": finite_median([row["f2"] for row in values]),
+            "surface_target_notes": aggregate_surface_notes(values),
         })
     return rows
 
@@ -368,7 +392,7 @@ def plot_single_fit(
     if not rows or not ellipse_rows:
         return
     colors = dict(zip(VOWEL_ORDER, plt.get_cmap("tab10").colors))
-    fig, ax = plt.subplots(figsize=(7.2, 6.4), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(7.2, 7.2))
     for row in rows:
         ax.scatter(row["f2"], row["f1"], color=colors[row["target_label"]], s=70, zorder=4)
         ax.text(row["f2"] + 0.03, row["f1"] - 0.03, vowel_label(row["target_label"]), fontsize=10, zorder=5)
@@ -401,22 +425,29 @@ def plot_single_fit(
     ax.set_ylabel(f"F1 ({unit})")
     missing = missing_vowel_labels(rows)
     title = f"Vowel-space ellipse fit: {group_id}"
+    notes: list[str] = []
     if missing:
         title += f"   incomplete: missing {', '.join(missing)}"
-        ax.text(
-            0.02,
-            0.02,
-            "Incomplete target set: missing " + ", ".join(missing),
-            transform=ax.transAxes,
-            ha="left",
-            va="bottom",
-            fontsize=9,
-            color="#8c2d04",
-            bbox={"boxstyle": "round,pad=0.25", "facecolor": "#fff7bc", "edgecolor": "#fec44f", "alpha": 0.92},
-            zorder=10,
-        )
+        notes.append("Incomplete target set: missing " + ", ".join(missing))
+    surface_notes = aggregate_surface_notes(rows)
+    if surface_notes:
+        notes.append("Allowed surface targets: " + surface_notes)
     ax.set_title(title)
     ax.legend(loc="best")
+    if notes:
+        fig.text(
+            0.02,
+            0.02,
+            wrapped_note("\n".join(notes)),
+            ha="left",
+            va="bottom",
+            fontsize=7.5,
+            color="#333333",
+            bbox={"boxstyle": "round,pad=0.25", "facecolor": "#f7fbff", "edgecolor": "#9ecae1", "alpha": 0.92},
+        )
+        fig.tight_layout(rect=(0.0, 0.18, 1.0, 1.0))
+    else:
+        fig.tight_layout()
     fig.savefig(output / f"{group_id}_ellipse_fit.png", dpi=160)
     plt.close(fig)
 
@@ -435,7 +466,7 @@ def main() -> int:
         "--context-mode",
         choices=["all", "non_r", "r_only"],
         default="all",
-        help="Word-level lexical context filter. non_r excludes words containing r/R; r_only keeps only them.",
+        help="Lexical context filter. non_r excludes words where r/R occurs after the vowel; r_only keeps only them.",
     )
     parser.add_argument(
         "--arrows",
@@ -508,17 +539,17 @@ def main() -> int:
     write_rows(
         args.output / "speaker_vowel_medians.csv",
         speaker_rows,
-        ["village", "speaker", "target_label", "ipa", "n_tokens", "f1", "f2"],
+        ["village", "speaker", "target_label", "ipa", "n_tokens", "f1", "f2", "surface_target_notes"],
     )
     write_rows(
         args.output / "recording_vowel_medians.csv",
         recording_rows,
-        ["recording", "village", "speaker", "target_label", "ipa", "n_tokens", "f1", "f2"],
+        ["recording", "village", "speaker", "target_label", "ipa", "n_tokens", "f1", "f2", "surface_target_notes"],
     )
     write_rows(
         args.output / "village_vowel_prototypes.csv",
         prototype_rows,
-        ["village", "target_label", "ipa", "n_speakers", "n_tokens", "f1", "f2"],
+        ["village", "target_label", "ipa", "n_speakers", "n_tokens", "f1", "f2", "surface_target_notes"],
     )
     write_rows(
         args.output / "village_ellipse_metrics.csv",
