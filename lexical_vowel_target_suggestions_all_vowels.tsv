@@ -1,0 +1,112 @@
+lexical_item	suggested_target_label	suggested_ipa	dominant_surface_seg_label	dominant_count	candidate_count	total_count	candidate_surface_seg_counts	surface_seg_counts	example_recordings
+lott			O	1314	1557	1557	O:1314; o:174; O_E:22; u:18; o_e:13; ö:6; E:4; Ö:2; A:2; O-E:1; o::1	O:1314; o:174; O_E:22; u:18; o_e:13; ö:6; E:4; Ö:2; A:2; O-E:1; o::1	ankarsrum_ym_1, ankarsrum_ym_2, ankarsrum_ym_3, anundsjo_ym_1, anundsjo_ym_2, anundsjo_ym_3, are_ym_1, are_ym_2
+lass			a	1141	1159	1159	a:1141; A:8; Ä:4; E:3; ä:1; aE:1; e:1	a:1141; A:8; Ä:4; E:3; ä:1; aE:1; e:1	alvdalen_ym_1, alvdalen_ym_2, alvdalen_ym_3, ankarsrum_ym_1, ankarsrum_ym_2, ankarsrum_ym_3, anundsjo_ym_1, anundsjo_ym_2
+flytta			y	1046	1154	1154	y:1046; o_e:23; U:15; ö:15; O_E:13; Ö:11; ö::10; y::9; Ö::4; Y:4; o_e::3; E:1	y:1046; o_e:23; U:15; ö:15; O_E:13; Ö:11; ö::10; y::9; Ö::4; Y:4; o_e::3; E:1	ankarsrum_ym_1, ankarsrum_ym_2, ankarsrum_ym_3, anundsjo_ym_1, anundsjo_ym_2, anundsjo_ym_3, are_ym_1, are_ym_2
+dörr			o_e	531	1141	1141	o_e:531; Ö:313; ö::92; 9:37; o_e::30; O_E:29; Ö::21; ö:18; O:17; ö:a:10; yo_e:7; E:7; o-e:5; U:5; y:4; A:4; yö:4; a:4; o_E:1; ö:E:1; E::1	o_e:531; Ö:313; ö::92; 9:37; o_e::30; O_E:29; Ö::21; ö:18; O:17; ö:a:10; yo_e:7; E:7; o-e:5; U:5; y:4; A:4; yö:4; a:4; o_E:1; ö:E:1; E::1	ankarsrum_ym_1, ankarsrum_ym_2, anundsjo_ym_1, anundsjo_ym_2, anundsjo_ym_3, arjeplog_ym_2, arjeplog_ym_3, arsunda_ym_1
+disk			i	1097	1134	1134	i:1097; I:29; e:7; u:1	i:1097; I:29; e:7; u:1	ankarsrum_ym_1, ankarsrum_ym_2, ankarsrum_ym_3, anundsjo_ym_1, anundsjo_ym_2, anundsjo_ym_3, are_ym_1, are_ym_2
+sitt			i	1081	1122	1122	i:1081; I:25; y:8; i::5; U:2; O:1	i:1081; I:25; y:8; i::5; U:2; O:1	ankarsrum_ym_1, ankarsrum_ym_2, ankarsrum_ym_3, anundsjo_ym_1, anundsjo_ym_2, anundsjo_ym_3, are_ym_1, are_ym_2
+lett			e	782	1118	1118	e:782; ä:312; ei:10; i:9; ie:2; Ä:1; E:1; O:1	e:782; ä:312; ei:10; i:9; ie:2; Ä:1; E:1; O:1	ankarsrum_ym_3, anundsjo_ym_1, anundsjo_ym_2, anundsjo_ym_3, are_ym_1, are_ym_2, are_ym_3, arjeplog_ym_1
+särk			Ä	823	1102	1102	Ä:823; ä:206; e:35; a:27; E:9; i:1; O:1	Ä:823; ä:206; e:35; a:27; E:9; i:1; O:1	ankarsrum_ym_1, ankarsrum_ym_2, ankarsrum_ym_3, anundsjo_ym_1, are_ym_1, are_ym_2, are_ym_3, arjeplog_ym_1
+blött			ö	444	1077	1077	ö:444; o_e:393; Ö:97; O:39; E:23; ö::18; U:14; a:10; o_ey:9; 2:6; O_E:5; yö:5; öi:4; o_e::4; ai:3; A:2; o_ei:1	ö:444; o_e:393; Ö:97; O:39; E:23; ö::18; U:14; a:10; o_ey:9; 2:6; O_E:5; yö:5; öi:4; o_e::4; ai:3; A:2; o_ei:1	anundsjo_ym_1, anundsjo_ym_2, anundsjo_ym_3, are_ym_3, arjeplog_ym_1, arjeplog_ym_2, arjeplog_ym_3, arstad_ym_1
+ludd			O_E	582	1063	1063	O_E:582; U:242; u:139; u0:44; u::21; O:10; E:10; o_e:6; o::5; O_E::4	O_E:582; U:242; u:139; u0:44; u::21; O:10; E:10; o_e:6; o::5; O_E::4	ankarsrum_ym_1, ankarsrum_ym_2, ankarsrum_ym_3, anundsjo_ym_1, anundsjo_ym_2, anundsjo_ym_3, are_ym_1, are_ym_2
+tysk			y	1024	1056	1056	y:1024; U:24; Y:4; i:2; u:1; y::1	y:1024; U:24; Y:4; i:2; u:1; y::1	ankarsrum_ym_1, ankarsrum_ym_2, ankarsrum_ym_3, anundsjo_ym_1, anundsjo_ym_2, anundsjo_ym_3, are_ym_1, are_ym_2
+dis			i:	914	1051	1051	i::914; I::125; e::8; I:2; ö::1; i:1	i::914; I::125; e::8; I:2; ö::1; i:1	ankarsrum_ym_1, ankarsrum_ym_2, ankarsrum_ym_3, anundsjo_ym_1, anundsjo_ym_2, anundsjo_ym_3, are_ym_1, are_ym_2
+sytt			y	966	1047	1047	y:966; U:36; Y:12; i:11; o_e:8; ö::5; Öu:2; ö:2; O:2; Ö:1; e:1; ä:1	y:966; U:36; Y:12; i:11; o_e:8; ö::5; Öu:2; ö:2; O:2; Ö:1; e:1; ä:1	ankarsrum_ym_1, ankarsrum_ym_2, ankarsrum_ym_3, anundsjo_ym_1, anundsjo_ym_2, anundsjo_ym_3, are_ym_1, are_ym_2
+såll			O	835	1021	1021	O:835; o:148; ö:14; u:13; o::4; A:2; O_E:2; Ö:2; o_e:1	O:835; o:148; ö:14; u:13; o::4; A:2; O_E:2; Ö:2; o_e:1	ankarsrum_ym_1, ankarsrum_ym_2, ankarsrum_ym_3, anundsjo_ym_1, anundsjo_ym_2, anundsjo_ym_3, are_ym_1, are_ym_2
+lätt			ä	495	601	601	ä:495; e:57; Ä:27; e::9; ä::5; o_e:4; E:2; I:2	ä:495; e:57; Ä:27; e::9; ä::5; o_e:4; E:2; I:2	anundsjo_ym_1, anundsjo_ym_2, anundsjo_ym_3, are_ym_1, are_ym_2, are_ym_3, arjeplog_ym_1, arjeplog_ym_2
+läsk			ä	284	496	496	ä:284; e:165; Ä:45; E:2	ä:284; e:165; Ä:45; E:2	ankarsrum_ym_1, ankarsrum_ym_2, ankarsrum_ym_3, asby_ym_1, asby_ym_2, asby_ym_3, bara_ym_1, bara_ym_2
+skott			u	439	474	474	u:439; U:22; O:6; o:4; O::3	u:439; U:22; O:6; o:4; O::3	ankarsrum_ym_1, ankarsrum_ym_3, asby_ym_1, asby_ym_2, asby_ym_3, bara_ym_1, bara_ym_2, bara_ym_3
+snott			u	307	369	369	u:307; o:32; O:16; O_E:11; u::2; E:1	u:307; o:32; O:16; O_E:11; u::2; E:1	are_ym_1, arjeplog_ym_1, arjeplog_ym_2, aspas_ym_2, aspas_ym_3, bjurholm_ym_1, bjurholm_ym_2, bjurholm_ym_3
+fisk			i	201	234	234	i:201; I:17; e:14; y:2	i:201; I:17; e:14; y:2	brando_ym_1, brando_ym_2, brando_ym_3, dragsfjard_ym_1, dragsfjard_ym_2, dragsfjard_ym_3, grangarde_ym_1, graso_ym_1
+frost			O	58	61	61	O:58; o:3	O:58; o:3	boda_ym_1, boda_ym_3, karna_ym_1, kramfors_ym_1, kramfors_ym_2, kramfors_ym_3, kramfors_ym_4, kramfors_ym_5
+ris			i:	32	57	57	i::32; Ai:15; I::6; ai:4	i::32; Ai:15; I::6; ai:4	aspas_ym_1, boda_ym_1, boda_ym_3, kramfors_ym_1, kramfors_ym_3, kramfors_ym_4, sorsele_ym_1, sorsele_ym_4
+präst			ä	28	43	43	ä:28; Ä:15	ä:28; Ä:15	boda_ym_1, boda_ym_3, kramfors_ym_1, kramfors_ym_3, kramfors_ym_4, sorsele_ym_1, sorsele_ym_4, sorsele_ym_5
+nytt			y	29	41	41	y:29; y::11; i:1	y:29; y::11; i:1	brando_ym_1, brando_ym_2, brando_ym_3, dragsfjard_ym_2, dragsfjard_ym_3, narpes_ym_1, narpes_ym_2, narpes_ym_3
+brott			O	26	39	39	O:26; o::10; o:3	O:26; o::10; o:3	kramfors_ym_1, kramfors_ym_3, kramfors_ym_4, munsala_ym_1, sorsele_ym_1, sorsele_ym_4, sorsele_ym_5, sorsele_ym_6
+rysk			y	34	39	39	y:34; y::5	y:34; y::5	boda_ym_1, boda_ym_3, kramfors_ym_1, kramfors_ym_3, kramfors_ym_4, munsala_ym_2, munsala_ym_3, sorsele_ym_1
+gris			i:	37	37	37	i::37	i::37	are_ym_2, munsala_ym_1, munsala_ym_2, munsala_ym_3, ragunda_ym_1, vemdalen_ym_1, vemdalen_ym_2, vemdalen_ym_3
+gröt			e	12	30	30	e:12; o_e:6; o_ey:5; o_ei:4; Öy:2; Öi:1	e:12; o_e:6; o_ey:5; o_ei:4; Öy:2; Öi:1	orsa_ym_1_2, orsa_ym_2_1, orsa_ym_2_2, orsa_ym_2_4, orsa_ym_3_1, orsa_ym_3_2, orsa_ym_3_3, orsa_ym_4_1
+glött			ö	21	29	29	ö:21; o_e:7; Ö:1	ö:21; o_e:7; Ö:1	kramfors_ym_1, kramfors_ym_3, kramfors_ym_4, sorsele_ym_1, sorsele_ym_6, torhamn_ym_1
+värre			Ä	28	28	28	Ä:28	Ä:28	anundsjo_ym_2, anundsjo_ym_3, arsunda_ym_1, ockelbo_ym_2, storsjo_ym_3, vemdalen_ym_1
+åtta			O	28	28	28	O:28	O:28	narpes_ym_1, narpes_ym_2, narpes_ym_3, vemdalen_ym_3, vora_ym_1, vora_ym_2, vora_ym_3
+snett			ei	12	27	27	ei:12; ä:11; ie:2; e:2	ei:12; ä:11; ie:2; e:2	vora_ym_1, vora_ym_2, vora_ym_3
+sött			ö	19	27	27	ö:19; Ö:4; yo_e:3; yö:1	ö:19; Ö:4; yo_e:3; yö:1	dragsfjard_ym_1, dragsfjard_ym_2, dragsfjard_ym_3, narpes_ym_2, narpes_ym_3, sorsele_ym_4
+brytt			y	26	26	26	y:26	y:26	boda_ym_1, boda_ym_3, kramfors_ym_1, kramfors_ym_3, kramfors_ym_4, sorsele_ym_1, sorsele_ym_4, sorsele_ym_5
+hund			O_E	26	26	26	O_E:26	O_E:26	dalby_ym_2, leksand_ym_1, sarna_ym_1, storsjo_ym_1, vilhelmina_ym_2, vilhelmina_ym_3
+där	ä:	æː	Ä:	22	23	23	Ä::22; ä::1	Ä::22; ä::1	anundsjo_ym_2, munsala_ym_1, munsala_ym_2, munsala_ym_3
+fångade			O	15	22	22	O:15; o:7	O:15; o:7	fole_ym_1, fole_ym_3, sproge_ym_1, sproge_ym_2, sproge_ym_3
+mörk			Ö	11	22	22	Ö:11; o_e:9; ö:2	Ö:11; o_e:9; ö:2	brando_ym_1, brando_ym_2, brando_ym_3
+rott			u	22	22	22	u:22	u:22	boda_ym_3, malung_ym_1, malung_ym_2, orsa_ym_1_1, orsa_ym_2_2, orsa_ym_2_3, orsa_ym_2_4, orsa_ym_3_1
+läsa			e	15	20	20	e:15; ä:5	e:15; ä:5	alvdalen_ym_1, alvdalen_ym_2, orsa_ym_2_2, orsa_ym_2_3, orsa_ym_2_4, orsa_ym_3_1, orsa_ym_3_2, orsa_ym_3_3
+brett			ei	18	19	19	ei:18; eiyyyy:1	ei:18; eiyyyy:1	munsala_ym_1, munsala_ym_2, munsala_ym_3
+res			ei	16	19	19	ei:16; e::2; ie::1	ei:16; e::2; ie::1	munsala_ym_1, munsala_ym_2, munsala_ym_3, vindeln_ym_1
+råd			o	17	19	19	o:17; O:2	o:17; O:2	alvdalen_ym_1, alvdalen_ym_2, orsa_ym_1_1, orsa_ym_2_2, orsa_ym_2_4, orsa_ym_3_1, orsa_ym_3_2, orsa_ym_3_3
+spott			U	16	19	19	U:16; O_E:3	U:16; O_E:3	alvdalen_ym_1, alvdalen_ym_2, alvdalen_ym_3, orsa_ym_2_2, orsa_ym_2_3, orsa_ym_2_4, orsa_ym_4_2, orsa_ym_4_3
+medans			ä	18	18	18	ä:18	ä:18	orsa_ym_1_2, orsa_ym_2_1, orsa_ym_2_3, orsa_ym_3_1, orsa_ym_3_2, orsa_ym_3_3, orsa_ym_4_1, orsa_ym_4_2
+pris			i	18	18	18	i:18	i:18	alvdalen_ym_1, alvdalen_ym_2, orsa_ym_1_1, orsa_ym_2_1, orsa_ym_2_2, orsa_ym_2_4, orsa_ym_3_1, orsa_ym_3_2
+syster			y	11	18	18	y:11; i:7	y:11; i:7	alvdalen_ym_1, alvdalen_ym_2, alvdalen_ym_3, orsa_ym_4_3
+blått			O	12	17	17	O:12; o:5	O:12; o:5	alvdalen_ym_1, orsa_ym_2_1, orsa_ym_2_2, orsa_ym_2_4, orsa_ym_3_1, orsa_ym_3_2, orsa_ym_3_3, orsa_ym_4_1
+dyrt			y	9	17	17	y:9; i:8	y:9; i:8	alvdalen_ym_1, alvdalen_ym_2, alvdalen_ym_3
+häst			ä	11	16	16	ä:11; e:5	ä:11; e:5	alvdalen_ym_2, orsa_ym_1_1, orsa_ym_2_2, orsa_ym_2_4, orsa_ym_3_1, orsa_ym_4_1, orsa_ym_4_2
+märr			Ä	15	16	16	Ä:15; ä:1	Ä:15; ä:1	alvdalen_ym_1, alvdalen_ym_2, alvdalen_ym_3, orsa_ym_2_2, orsa_ym_2_3, orsa_ym_2_4, orsa_ym_3_3, orsa_ym_4_2
+stjäla	e:	eː	e:	10	16	16	e::10; ä::6	e::10; ä::6	fole_ym_1, sproge_ym_2, sproge_ym_3
+gräs	ä:	æː	Ä:	10	15	15	Ä::10; ä::5	Ä::10; ä::5	munsala_ym_1, munsala_ym_2
+led			e	9	15	15	e:9; ie:6	e:9; ie:6	orsa_ym_3_1, orsa_ym_3_2, orsa_ym_3_3, orsa_ym_4_1, orsa_ym_4_2
+dike			Ai	11	14	14	Ai:11; ai:3	Ai:11; ai:3	alvdalen_ym_1, orsa_ym_2_1, orsa_ym_2_2, orsa_ym_3_1, orsa_ym_3_2, orsa_ym_3_3, orsa_ym_4_1, orsa_ym_4_2
+kol			uo_e	14	14	14	uo_e:14	uo_e:14	alvdalen_ym_1, alvdalen_ym_2, orsa_ym_2_1, orsa_ym_2_3, orsa_ym_2_4, orsa_ym_3_1, orsa_ym_3_2, orsa_ym_3_3
+kål			o	8	14	14	o:8; o~:3; u:3	o:8; o~:3; u:3	alvdalen_ym_2, orsa_ym_2_1, orsa_ym_2_3, orsa_ym_2_4, orsa_ym_4_1, orsa_ym_4_2
+rad			A	14	14	14	A:14	A:14	alvdalen_ym_1, alvdalen_ym_2, orsa_ym_2_1, orsa_ym_2_2, orsa_ym_2_4, orsa_ym_3_1, orsa_ym_3_2, orsa_ym_3_3
+värk			Ä	13	13	13	Ä:13	Ä:13	karna_ym_1, skee_ym_2, skee_ym_3
+blöt(s)			Ä	11	12	12	Ä:11; o_e:1	Ä:11; o_e:1	orsa_ym_1_2, orsa_ym_2_3, orsa_ym_2_4, orsa_ym_3_1, orsa_ym_3_2, orsa_ym_3_3, orsa_ym_4_1, orsa_ym_4_3
+bär	ä:	æː	Ä:	12	12	12	Ä::12	Ä::12	brando_ym_3, dragsfjard_ym_1, dragsfjard_ym_2, dragsfjard_ym_3
+hett			Ä	12	12	12	Ä:12	Ä:12	narpes_ym_1, narpes_ym_2, narpes_ym_3
+leda			ei	12	12	12	ei:12	ei:12	vora_ym_1, vora_ym_2, vora_ym_3
+rost			o_e	12	12	12	o_e:12	o_e:12	orsa_ym_2_2, orsa_ym_2_3, orsa_ym_2_4, orsa_ym_3_1, orsa_ym_3_2, orsa_ym_3_3, orsa_ym_4_1, orsa_ym_4_3
+röst			o_e	12	12	12	o_e:12	o_e:12	alvdalen_ym_1, alvdalen_ym_2, alvdalen_ym_3, orsa_ym_1_2
+tand			O	8	12	12	O:8; o:3; a:1	O:8; o:3; a:1	orsa_ym_2_1, orsa_ym_2_4, orsa_ym_3_1, orsa_ym_3_2, orsa_ym_3_3, orsa_ym_4_1, orsa_ym_4_2
+tunn			O	8	12	12	O:8; OE:4	O:8; OE:4	narpes_ym_1, narpes_ym_2, narpes_ym_3
+tam			A	7	11	11	A:7; o:4	A:7; o:4	orsa_ym_2_2, orsa_ym_2_3, orsa_ym_2_4, orsa_ym_3_1, orsa_ym_3_2, orsa_ym_3_3, orsa_ym_4_1
+resa			ie~	7	10	10	ie~:7; ie:3	ie~:7; ie:3	alvdalen_ym_1, alvdalen_ym_3
+stor	o:	oː	o:	7	10	10	o::7; Ou::3	o::7; Ou::3	dragsfjard_ym_1, dragsfjard_ym_2
+blod			o_e	9	9	9	o_e:9	o_e:9	orsa_ym_2_2, orsa_ym_2_3, orsa_ym_2_4, orsa_ym_3_1, orsa_ym_3_2, orsa_ym_3_3, orsa_ym_4_1, orsa_ym_4_3
+bytt			y	9	9	9	y:9	y:9	malung_ym_1, malung_ym_2, malung_ym_3
+kyta			oy	6	9	9	oy:6; oi:3	oy:6; oi:3	alvdalen_ym_1, alvdalen_ym_3
+luft			u	6	9	9	u:6; O_E:3	u:6; O_E:3	dragsfjard_ym_1, dragsfjard_ym_3
+lät			uo	5	9	9	uo:5; o::3; o:1	uo:5; o::3; o:1	munsala_ym_2, munsala_ym_3
+morgon			o_e	9	9	9	o_e:9	o_e:9	orsa_ym_2_2, orsa_ym_2_3, orsa_ym_2_4, orsa_ym_3_1, orsa_ym_3_2, orsa_ym_3_3, orsa_ym_4_2, orsa_ym_4_3
+ratt			a	9	9	9	a:9	a:9	orsa_ym_1_1
+son	o:	oː	o:	7	9	9	o::7; O_E::2	o::7; O_E::2	skee_ym_1, tjallmo_ym_3
+lov			uo	8	8	8	uo:8	uo:8	narpes_ym_1, narpes_ym_2
+orm			u	8	8	8	u:8	u:8	tjallmo_ym_2, tjallmo_ym_3
+låsa			ä~	4	7	7	ä~:4; e~:3	ä~:4; e~:3	alvdalen_ym_1
+ruff			O_E	4	7	7	O_E:4; u:3	O_E:4; u:3	brando_ym_3
+lam			A	6	6	6	A:6	A:6	orsa_ym_1_1
+mörkt			o_e	4	6	6	o_e:4; ö:2	o_e:4; ö:2	dragsfjard_ym_1, dragsfjard_ym_2
+röd			o	3	6	6	o:3; o_e:3	o:3; o_e:3	alvdalen_ym_2
+ås			o~	6	6	6	o~:6	o~:6	alvdalen_ym_1, alvdalen_ym_2
+lova	ö:	øː	ö:	4	5	5	ö::4; o::1	ö::4; o::1	skee_ym_1
+lärka			Ä	5	5	5	Ä:5	Ä:5	are_ym_1
+blåst			ä	3	4	4	ä:3; o:1	ä:3; o:1	alvdalen_ym_1
+glott			u	4	4	4	u:4	u:4	torhamn_ym_2
+göut			öu	4	4	4	öu:4	öu:4	houtskar_ym_1
+kaka	A:	ɑː	A:	4	4	4	A::4	A::4	v_vingaker_ym_1
+rodd			u	4	4	4	u:4	u:4	malung_ym_2
+rönn			öu	4	4	4	öu:4	öu:4	houtskar_ym_1
+tunna			O_E	4	4	4	O_E:4	O_E:4	torp_ym_3
+tunt			O_E	4	4	4	O_E:4	O_E:4	torp_ym_1
+öra			öi	4	4	4	öi:4	öi:4	houtskar_ym_1
+blåst(sup)			Ä	3	3	3	Ä:3	Ä:3	alvdalen_ym_2
+brosk			O	3	3	3	O:3	O:3	vindeln_ym_1
+butt			O_E	3	3	3	O_E:3	O_E:3	orsa_ym_1_1
+din(f)			Ai~	3	3	3	Ai~:3	Ai~:3	alvdalen_ym_1
+han			a	3	3	3	a:3	a:3	orsa_ym_1_1
+hus			au	3	3	3	au:3	au:3	alvdalen_ym_3
+lada			ie	3	3	3	ie:3	ie:3	narpes_ym_2
+lotten			O	3	3	3	O:3	O:3	leksand_ym_1
+rev	e:	eː	e:	3	3	3	e::3	e::3	dragsfjard_ym_3
+rodde			u	3	3	3	u:3	u:3	malung_ym_3
+rått			O	3	3	3	O:3	O:3	orsa_ym_1_1
+sant			O	2	3	3	O:2; a:1	O:2; a:1	orsa_ym_3_1, orsa_ym_3_3
+snodd			u	3	3	3	u:3	u:3	torhamn_ym_3
+söma	ö:	øː	ö:	3	3	3	ö::3	ö::3	dragsfjard_ym_3
+vift			i	3	3	3	i:3	i:3	dragsfjard_ym_3

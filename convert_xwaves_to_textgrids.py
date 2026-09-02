@@ -391,6 +391,61 @@ def choose_unique_pass_matches(
     return selected, provenance, max_speakers
 
 
+def write_complete_textgrids(
+    matches: list[dict],
+    wavs: list[Recording],
+    output: Path,
+    provenance: dict[str, str] | None = None,
+) -> int:
+    wav_by_name = {recording.path.name: recording.path for recording in wavs}
+    output.mkdir(parents=True, exist_ok=True)
+    for old_textgrid in output.glob("*.TextGrid"):
+        old_textgrid.unlink()
+    generated = 0
+    for match in matches:
+        for speaker in match["speakers"]:
+            if speaker["ord"] == "MISSING" or speaker["seg"] == "MISSING":
+                continue
+            preferred_media = None
+            preferred_annotations = None
+            if provenance:
+                source = provenance.get(match["code"])
+                if source == "sounds/sannotations":
+                    preferred_media = Path("sounds")
+                    preferred_annotations = Path("sannotations")
+                elif source == "Media/Annotations":
+                    preferred_media = Path("Media")
+                    preferred_annotations = Path("Annotations")
+            wav_path = (preferred_media / speaker["wav"]) if preferred_media else wav_by_name.get(speaker["wav"])
+            if wav_path is not None and not wav_path.exists():
+                wav_path = wav_by_name.get(speaker["wav"])
+            if wav_path is None:
+                continue
+            annotation_dir = preferred_annotations or Path("sannotations" if wav_path.parent.name == "sounds" else "Annotations")
+            ord_path = annotation_dir / speaker["ord"]
+            seg_path = annotation_dir / speaker["seg"]
+            if not ord_path.exists():
+                ord_path = Path("sannotations") / speaker["ord"]
+            if not ord_path.exists():
+                ord_path = Path("Annotations") / speaker["ord"]
+            if not seg_path.exists():
+                seg_path = Path("sannotations") / speaker["seg"]
+            if not seg_path.exists():
+                seg_path = Path("Annotations") / speaker["seg"]
+            if not ord_path.exists() or not seg_path.exists():
+                continue
+
+            duration = wav_duration(wav_path)
+            tiers = []
+            for tier_name, annotation in (("ord", ord_path), ("seg", seg_path)):
+                parsed = parse_xwaves(annotation)
+                intervals, _ = contiguous(parsed.intervals, duration)
+                tiers.append((tier_name, intervals))
+            write_textgrid(output / f"{wav_path.stem}.TextGrid", duration, tiers)
+            generated += 1
+    return generated
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--places", type=Path, default=Path("Orter_SweDia.csv"))
@@ -413,6 +468,7 @@ def main() -> int:
     parser.add_argument("--compact-summary", type=Path, default=Path("sweDia_inventory_compact.tsv"))
     parser.add_argument("--resource", type=Path, default=Path("resource.txt"))
     parser.add_argument("--all-compact-summary", type=Path, default=Path("sweDia_inventory_all_compact.tsv"))
+    parser.add_argument("--all-complete-output", type=Path, default=Path("TextGrids_all_wos"))
     args = parser.parse_args()
 
     media_dirs = args.media or [Path("sounds"), Path("Media")]
@@ -469,6 +525,11 @@ def main() -> int:
             include_status=True,
             provenance=provenance,
         )
+        all_complete_generated = write_complete_textgrids(
+            all_matches, parsed_wavs, args.all_complete_output, provenance
+        )
+    else:
+        all_complete_generated = 0
 
     generated = sum(len(match["speakers"]) for match in matches)
     missing_places = sum(not match["stem"] for match in matches)
@@ -479,6 +540,7 @@ def main() -> int:
     print(f"Compact summary: {args.compact_summary}")
     if args.resource.exists():
         print(f"All-villages compact summary: {args.all_compact_summary}")
+        print(f"All w,o,s TextGrids: {args.all_complete_output} ({all_complete_generated})")
     print(f"Unmatched villages: {missing_places}; missing ord: {missing_ord}; missing seg: {missing_seg}")
     return 0
 
