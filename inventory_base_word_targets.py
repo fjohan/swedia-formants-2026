@@ -3,8 +3,8 @@
 
 This is deliberately narrower than the formant-analysis lexical map.  It only
 checks the eight current base words, and it counts an occurrence only when the
-word in .ord has exactly one vowel-like .seg interval inside it.  Surface .seg
-labels are summarized in notes but are not used to reject a lexical target
+word in the ``ord`` TextGrid tier has exactly one vowel-like ``seg`` interval
+inside it. Surface segment labels are summarized in notes but are not used to reject a lexical target
 unless --strict-seg-label is used.
 
 The base target list is kept in one small constant so a second pass can add
@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import re
 from collections import defaultdict
 from pathlib import Path
 
@@ -23,8 +24,6 @@ from convert_xwaves_to_textgrids import (
     choose_unique_pass_matches,
     collect_annotations,
     collect_wavs,
-    parse_xwaves,
-    read_places,
     read_resource_places,
     recording_parts,
     status_for_match,
@@ -85,13 +84,14 @@ ALLOWED_SURFACE_TARGETS = {
     ("lat", "ɑ:", "O:"),
     ("leta", "e:", "ä:"),
 }
+#ALLOWED_SURFACE_TARGETS = {}
 
 SOURCE_PAIRS = {
-    "media_annotations": [("Media/Annotations", Path("Media"), Path("Annotations"))],
-    "sounds_sannotations": [("sounds/sannotations", Path("sounds"), Path("sannotations"))],
+    "media": [("Media/TextGrids_all_wos", Path("Media"), Path("TextGrids_all_wos"))],
+    "sounds": [("sounds/TextGrids_all_wos", Path("sounds"), Path("TextGrids_all_wos"))],
     "auto": [
-        ("sounds/sannotations", Path("sounds"), Path("sannotations")),
-        ("Media/Annotations", Path("Media"), Path("Annotations")),
+        ("sounds/TextGrids_all_wos", Path("sounds"), Path("TextGrids_all_wos")),
+        ("Media/TextGrids_all_wos", Path("Media"), Path("TextGrids_all_wos")),
     ],
 }
 
@@ -118,29 +118,13 @@ def compact_target_column(target: dict) -> str:
     return f'{target["word"]}_{target["target"].replace(":", "").replace("A", "ɑ").replace("ä", "æ").replace("U", "ʉ").replace("ö", "ø")}'
 
 
-def read_original_codes(path: Path) -> set[str]:
-    return {code for code, _ in read_places(path)}
-
-
-def places_for_scope(scope: str, places_path: Path, resource_path: Path) -> list[dict]:
-    original = [{"code": code, "place": place, "hints": [], "section": "Orter_SweDia"} for code, place in read_places(places_path)]
-    if scope == "original":
-        return original
-
+def places_from_resource(resource_path: Path) -> list[dict]:
     if not resource_path.exists():
-        raise FileNotFoundError(f"{resource_path} is required for --village-scope {scope}")
-
-    original_codes = read_original_codes(places_path)
-    resource = [
-        {"code": code, "place": place, "hints": [resource_stem],
-         "section": "Orter_SweDia" if code in original_codes else "rest"}
+        raise FileNotFoundError(f"Village resource file not found: {resource_path}")
+    return [
+        {"code": code, "place": place, "hints": [resource_stem], "section": "all"}
         for code, place, resource_stem in read_resource_places(resource_path)
     ]
-    if scope == "all":
-        return resource
-    if scope == "original_rest":
-        return sorted(resource, key=lambda row: (row["section"] != "Orter_SweDia", row["place"]))
-    raise ValueError(f"unknown village scope: {scope}")
 
 
 def matches_for_places(places: list[dict], source_mode: str) -> tuple[list[dict], dict[str, str]]:
@@ -151,21 +135,21 @@ def matches_for_places(places: list[dict], source_mode: str) -> tuple[list[dict]
         matches, _ = build_matches(
             place_tuples,
             collect_wavs([media_dir]),
-            collect_annotations([annotation_dir], "ord"),
-            collect_annotations([annotation_dir], "seg"),
+            collect_annotations([annotation_dir], "TextGrid"),
+            collect_annotations([annotation_dir], "TextGrid"),
         )
         return matches, {match["code"]: pairs[0][0] for match in matches}
 
     parsed_wavs = collect_wavs([media for _, media, _ in pairs])
-    ord_annotations = collect_annotations([annotations for _, _, annotations in pairs], "ord")
-    seg_annotations = collect_annotations([annotations for _, _, annotations in pairs], "seg")
+    ord_annotations = collect_annotations([annotations for _, _, annotations in pairs], "TextGrid")
+    seg_annotations = ord_annotations
     default_matches, _ = build_matches(place_tuples, parsed_wavs, ord_annotations, seg_annotations)
     source_matches = {
         label: build_matches(
             place_tuples,
             collect_wavs([media_dir]),
-            collect_annotations([annotation_dir], "ord"),
-            collect_annotations([annotation_dir], "seg"),
+            collect_annotations([annotation_dir], "TextGrid"),
+            collect_annotations([annotation_dir], "TextGrid"),
         )[0]
         for label, media_dir, annotation_dir in pairs
     }
@@ -176,25 +160,43 @@ def matches_for_places(places: list[dict], source_mode: str) -> tuple[list[dict]
 
 
 def source_dirs(label: str, source_mode: str) -> tuple[Path | None, Path | None]:
-    if label == "Media/Annotations":
-        return Path("Media"), Path("Annotations")
-    if label == "sounds/sannotations":
-        return Path("sounds"), Path("sannotations")
+    if label == "Media/TextGrids_all_wos":
+        return Path("Media"), Path("TextGrids_all_wos")
+    if label == "sounds/TextGrids_all_wos":
+        return Path("sounds"), Path("TextGrids_all_wos")
     if source_mode != "auto":
         _, media_dir, annotation_dir = SOURCE_PAIRS[source_mode][0]
         return media_dir, annotation_dir
     return None, None
 
 
-def choose_existing_annotation(stem: str, extension: str, preferred: Path | None) -> Path | None:
-    candidates = []
-    if preferred is not None:
-        candidates.append(preferred / f"{stem}.{extension}")
-    candidates.extend([Path("sannotations") / f"{stem}.{extension}", Path("Annotations") / f"{stem}.{extension}"])
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return None
+def choose_existing_annotation(stem: str, preferred: Path | None) -> Path | None:
+    directory = preferred or Path("TextGrids_all_wos")
+    candidate = directory / f"{stem}.TextGrid"
+    return candidate if candidate.exists() else None
+
+
+def parse_textgrid_tier(path: Path, tier_name: str) -> list[tuple[float, float, str]]:
+    """Read intervals from one tier of a long-text Praat TextGrid."""
+    text = path.read_text(encoding="utf-8")
+    tier_blocks = re.split(r"(?m)^    item \[\d+\]:\s*$", text)[1:]
+    for block in tier_blocks:
+        name = re.search(r'(?m)^        name = "(.*)"\s*$', block)
+        if not name or name.group(1) != tier_name:
+            continue
+        intervals = []
+        for match in re.finditer(
+            r'(?ms)^        intervals \[\d+\]:\s*\n'
+            r'            xmin = ([^\n]+)\n'
+            r'            xmax = ([^\n]+)\n'
+            r'            text = "((?:[^"\\]|\\.)*)"',
+            block,
+        ):
+            label = match.group(3).replace('""', '"')
+            if label:
+                intervals.append((float(match.group(1)), float(match.group(2)), label))
+        return intervals
+    raise ValueError(f"Tier {tier_name!r} not found in {path}")
 
 
 def second_lat_window(words: list[tuple[float, float, str]]) -> tuple[float, float] | None:
@@ -223,8 +225,8 @@ def count_base_targets(
     strict_seg_label: bool = False,
     allow_surface_targets: bool = False,
 ) -> tuple[dict[str, int], dict[str, int], int, dict[str, str]]:
-    words = parse_xwaves(ord_path).intervals
-    segments = parse_xwaves(seg_path).intervals
+    words = parse_textgrid_tier(ord_path, "ord")
+    segments = parse_textgrid_tier(seg_path, "seg")
     targets_by_word = {target["word"]: target for target in EXTRA_COUNTS}
     targets_by_word.update({target["word"]: target for target in BASE_TARGETS})
     second_låt_target = EXTRA_COUNTS[0]
@@ -322,7 +324,7 @@ def speaker_sort_key(speaker_id: str) -> tuple:
 
 
 def build_rows(args: argparse.Namespace) -> list[dict]:
-    places = places_for_scope(args.village_scope, args.places, args.resource)
+    places = places_from_resource(args.resource)
     section_by_code = {row["code"]: row["section"] for row in places}
     matches, provenance = matches_for_places(places, args.source_mode)
     rows = []
@@ -334,8 +336,8 @@ def build_rows(args: argparse.Namespace) -> list[dict]:
             if speaker["wav"] == "MISSING" or speaker["ord"] == "MISSING" or speaker["seg"] == "MISSING":
                 continue
             stem = Path(speaker["wav"]).stem
-            ord_path = choose_existing_annotation(stem, "ord", annotation_dir)
-            seg_path = choose_existing_annotation(stem, "seg", annotation_dir)
+            ord_path = choose_existing_annotation(stem, annotation_dir)
+            seg_path = ord_path
             if ord_path is None or seg_path is None:
                 continue
             counts, surface_counts_valid, surface_alt_total, notes = count_base_targets(
@@ -378,9 +380,7 @@ def build_rows(args: argparse.Namespace) -> list[dict]:
             row["notes"] = " | ".join(note_values)
             rows.append(row)
 
-    section_order = {"Orter_SweDia": 0, "rest": 1}
     return sorted(rows, key=lambda row: (
-        section_order.get(row["section"], 2),
         row["village"],
         speaker_sort_key(row["speaker"]),
         row["recording"],
@@ -436,22 +436,12 @@ def write_tsv(path: Path, rows: list[dict], detailed: bool = False) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--places", type=Path, default=Path("Orter_SweDia.csv"))
     parser.add_argument("--resource", type=Path, default=Path("resource.txt"))
     parser.add_argument(
-        "--village-scope",
-        choices=["original", "original_rest", "all"],
-        default="original",
-        help=(
-            "original = Orter_SweDia.csv only; original_rest = all resource villages with section labels; "
-            "all = all resource villages without special filtering."
-        ),
-    )
-    parser.add_argument(
         "--source-mode",
-        choices=["auto", "media_annotations", "sounds_sannotations"],
+        choices=["auto", "media", "sounds"],
         default="auto",
-        help="Which wav/annotation directory pair to inspect.",
+        help="Which wav directory to inspect; annotations come from TextGrids_all_wos.",
     )
     parser.add_argument("--min-reps", type=int, default=3, help="Repetitions per base target required for high rating.")
     parser.add_argument(

@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>swedia-formants-pca-2026</title>
+  <style>
+    :root {
+      --bg: #f5f1e8;
+      --panel: #fffdf8;
+      --border: #d8cdbd;
+      --text: #1e1a16;
+      --muted: #6b6259;
+      --user: #dbeafe;
+      --assistant: #e7f7df;
+      --thinking: #fef3c7;
+      --code: #ece7ff;
+      --shadow: 0 12px 30px rgba(56, 43, 27, 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(255,255,255,0.75), transparent 30%),
+        linear-gradient(180deg, #f3efe5 0%, #ede7db 100%);
+    }
+    .page {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 32px 16px 48px;
+    }
+    .header {
+      margin-bottom: 20px;
+      padding: 20px 22px;
+      background: rgba(255, 253, 248, 0.8);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-family: "IBM Plex Serif", Georgia, serif;
+      font-size: clamp(1.6rem, 3vw, 2.3rem);
+    }
+    .subtle {
+      margin: 0;
+      color: var(--muted);
+    }
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 18px 0 24px;
+    }
+    button {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      padding: 10px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      font: inherit;
+      box-shadow: var(--shadow);
+    }
+    .transcript {
+      display: grid;
+      gap: 14px;
+    }
+    .is-hidden {
+      display: none !important;
+    }
+    .message {
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: var(--panel);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    .message.user { border-left: 8px solid #60a5fa; background: linear-gradient(180deg, var(--user), #f8fbff); }
+    .message.assistant { border-left: 8px solid #65a30d; background: linear-gradient(180deg, var(--assistant), #fbfff8); }
+    .message.thinking { border-left: 8px solid #d97706; background: linear-gradient(180deg, var(--thinking), #fffdf4); }
+    .message.code { border-left: 8px solid #7c3aed; background: linear-gradient(180deg, var(--code), #faf8ff); }
+    .label {
+      display: block;
+      padding: 14px 18px 0;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .message pre {
+      margin: 0;
+      padding: 12px 18px 18px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+    details > summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 0 0 14px;
+    }
+    details > summary::-webkit-details-marker { display: none; }
+    details > summary .label::after {
+      content: " (collapsed)";
+      color: var(--muted);
+      font-weight: 500;
+    }
+    details[open] > summary .label::after {
+      content: " (expanded)";
+    }
+    @media (max-width: 640px) {
+      .page { padding: 20px 10px 36px; }
+      .header { padding: 16px; }
+      .message pre { font-size: 0.9rem; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="header">
+      <h1>swedia-formants-pca-2026</h1>
+      <p class="subtle">Transcript-style rendering of a Codex rollout file.</p>
+    </header>
+    <div class="toolbar">
+      <button type="button" data-view="conversation">Conversation Only</button>
+      <button type="button" data-view="user">User Only</button>
+      <button type="button" data-target="thinking">Toggle Thinking</button>
+      <button type="button" data-target="code">Toggle Code Output</button>
+    </div>
+    <section class="transcript">
+      <section class="message user">
+      <div class="label">User</div>
+      <pre>Hello, you are in a repo where we perform acoustic analyses of dialect data.
+
+Sounds are in Media and sounds
+Annotations are in TextGrids_all_wos
+Analyses are in Analyses
+
+We should start with modifying inventory_base_word_targets.py
+
+This currently looks for a file Orter_SweDia.csv but this is not needed.
+It also looks for annotations in Annotations and sannotations, but these are moved to the TextGrid dir.
+
+I think this should be enough to run the script. Please modify and test.</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Updated [inventory_base_word_targets.py](/data/html/dev/swedia-formants-2026/inventory_base_word_targets.py):
+
+- Removed the `Orter_SweDia.csv` dependency.
+- Uses `resource.txt` for village metadata.
+- Reads `ord` and `seg` tiers directly from `TextGrids_all_wos/*.TextGrid`.
+- Matches recordings from both `Media` and `sounds`.
+- Updated `--source-mode` options to `auto`, `media`, and `sounds`.
+
+Testing succeeded:
+
+- `auto`: 288 speakers
+- `media`: 227 speakers
+- `sounds`: 61 speakers
+- Detailed and compact outputs both generated correctly.
+- Python compilation passed.
+- Inventory counts were nonzero and internally consistent.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>I have done some formant analyses with Praat/lpc but i am interested in testing pca of bandfiltered speech like they do in
+
+Measuring and comparing vowel qualities in a Dutch spontaneous speech corpus
+
+and
+
+An Acoustic Analysis of Vowel Pronunciation in Swedish Dialects
+
+PCA of Bark/critical-band-filtered spectra is a very plausible alternative here, and potentially an excellent robustness analysis alongside conventional F1/F2. It has a long history in vowel analysis: spectra are reduced to energy in auditory-scaled frequency bands, and PCA then finds the main dimensions along which those spectral shapes vary. Early work found that the first two PCs often correspond fairly strongly to the information represented by the lower formants.
+
+I think this could be especially useful here since some of the material is likely diphthongized and formant tracking is tricky to tuna for that kind of data.
+
+We should also pay attention to visualization of this.
+
+So first make an assessment of what is possible.
+
+There is not much in terms of libraries in this environment, but tell me what to install if needed.</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Yes—this is feasible with the current recordings and annotations, and it is especially promising as a complementary analysis for diphthongized vowels and unreliable LPC tracks.
+
+The repository currently contains:
+
+- 342 mono WAV recordings, totaling about 61 hours.
+- 341 recordings sampled at 16 kHz and one at 48 kHz.
+- 288 matching two-tier TextGrids.
+- Existing lexical target definitions and vowel boundaries.
+- Existing F1/F2 results that can serve as an external validation set.
+
+One important clarification: “Bark-filtered spectra” means measuring spectral energy through a bank of auditory-frequency filters. It does not normally mean applying one broad band-pass filter to the waveform.
+
+## What the cited work did
+
+Jacobi, Pols, and Stroop used:
+
+- 20 Bark filters extending to 21 Bark.
+- Level normalization of each spectrum to 80 dB.
+- Averaging of the first two filters to reduce F0-related variation.
+- Midpoint measurements for anchor monophthongs.
+- Measurements at 10% and 90% for diphthongs and long vowels.
+- Measurements every 10 ms when studying trajectories.
+- PCA trained on speaker means for the anchor vowels `/a i u/`.
+- Speaker-relative normalization because recording quality shifted and resized PC vowel spaces.
+
+Their first three PCs explained 93% of the anchor-vowel spectral variance; PC1 correlated most strongly with F1 and PC2 with F2. They also found the spectral analysis sensitive to signal-to-noise ratio, despite being less dependent on tracking decisions. [Jacobi et al. paper](https://pure.uva.nl/ws/files/4394344/47200_isij.pdf)
+
+Leinonen applied essentially this family of methods directly to SweDia:
+
+- Nineteen Swedish vowels.
+- Bark-filtered spectra.
+- Separate male and female analyses, using approximately 2–17 Bark for men and 3–18 Bark for women.
+- Averaging repeated productions per speaker.
+- Two rotated components explaining nearly 80% of variance.
+- PC1 interpreted mainly as vowel height and PC2 as tongue advancement.
+- Geographic maps and aggregate distance analyses for dialect comparison.
+
+That makes this more than merely plausible for the present corpus: it is close to a partial replication using the same underlying SweDia material. [Leinonen thesis record and chapters](https://research.rug.nl/en/publications/an-acoustic-analysis-of-vowel-pronunciation-in-swedish-dialects/)
+
+## Recommended first implementation
+
+I would build a reproducible pilot before processing all 288 recordings.
+
+For every selected vowel token:
+
+1. Read its `seg` interval from the TextGrid.
+2. Extract spectra at normalized time points, preferably 10%, 25%, 50%, 75%, and 90%.
+3. Compute auditory-filter energies across approximately 1–21 Bark.
+4. Convert power to dB.
+5. Apply explicit level normalization while retaining the original level as a diagnostic.
+6. Save the full filter vector for every token and time point.
+7. Fit PCA on a clearly defined reference set.
+8. Project all remaining tokens using the same fitted PCA.
+9. Compare PC scores with existing Bark F1/F2 measurements.
+
+The five normalized time points are preferable to midpoint-only measurements here. They capture diphthongization while remaining compact. A 10 ms trajectory can be added later if the pilot shows useful structure.
+
+## PCA design
+
+There are three defensible models worth comparing:
+
+- Global PCA: fit one model to all speakers and target vowels. Easy to interpret and appropriate for a first exploratory analysis.
+- Anchor-vowel PCA: fit loadings using corner/anchor vowels, following Jacobi and Leinonen more closely. This needs careful mapping because the current eight targets do not provide completely ideal `/a i u/` anchors.
+- Sex- or speaker-group-specific PCA: closer to Leinonen, but less convenient for direct comparison because scores from independently fitted PC spaces are not automatically commensurable.
+
+I recommend global PCA as the primary pilot, with anchor-trained PCA as a sensitivity analysis. Do not fit a separate PCA for every speaker or village: component axes would then vary and could not be compared directly.
+
+Varimax rotation should be optional. Unrotated PCA is simpler, uniquely variance-ordered, and readily available through NumPy. A rotated two-component result would facilitate a closer replication of Leinonen.
+
+## Major methodological risks
+
+Spectral PCA avoids formant identity errors, but it is not automatically noise-proof.
+
+The important confounds are:
+
+- Microphone and recording-channel differences.
+- Background noise and spectral tilt.
+- Speaker F0, especially in the lowest auditory bands.
+- Overall signal level.
+- Sex and vocal-tract-length differences.
+- Spectral leakage from consonants near vowel boundaries.
+- Unequal numbers of repetitions per speaker and vowel.
+- PCA learning recording source or speaker identity instead of vowel quality.
+
+Accordingly, every output row should retain recording source, speaker, duration, time point, RMS level, and some spectral/noise diagnostic. We should explicitly test whether PC1/PC2 predict `Media` versus `sounds`; strong source separation would be a warning.
+
+The single 48 kHz recording should be resampled to 16 kHz, or its spectral analysis should be limited to the same maximum frequency as all other recordings.
+
+## Visualization
+
+A useful visualization suite would include:
+
+- PC1–PC2 vowel spaces with reversed axes if that makes them align perceptually with conventional F2–F1 vowel plots.
+- Speaker or village centroids with uncertainty ellipses.
+- Token trajectories from 10% to 90%, with arrows and consistent vowel colors.
+- Side-by-side PC1–PC2 and Bark F2–F1 panels.
+- PC loading curves over Bark bands, essential for interpreting what each component represents.
+- Reconstructed spectra at selected positions in PC space.
+- Scree and cumulative-variance plots.
+- PC-versus-formant correlation plots.
+- Recording-source and SNR diagnostic plots.
+- Later, geographic maps of vowel-specific PC positions or trajectory displacement.
+
+For diphthongization, trajectory plots and normalized displacement are more informative than static midpoint ellipses. A simple measure such as Euclidean PC displacement from 10% to 90%, normalized by the speaker’s vowel-space scale, would be useful.
+
+## Dependencies
+
+The active Python environment currently has NumPy 2.3.5, but lacks SciPy, pandas, scikit-learn, matplotlib, seaborn, librosa, soundfile, and Parselmouth.
+
+The smallest useful installation is:
+
+```bash
+python3 -m pip install scipy matplotlib
+```
+
+That is enough for:
+
+- WAV reading and resampling
+- spectral/filter-bank calculations
+- PCA through NumPy SVD
+- plots
+
+My preferred practical environment would be:
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install numpy scipy matplotlib pandas scikit-learn
+```
+
+Optional:
+
+```bash
+.venv/bin/pip install praat-parselmouth
+```
+
+`praat-parselmouth` is useful for direct comparison with the formant pipeline, but it is not required to calculate Bark-filter spectra. `librosa` and `seaborn` are also unnecessary; the core method is clearer and more reproducible if implemented directly with NumPy/SciPy.
+
+## Assessment
+
+This is technically straightforward and scientifically well motivated. The strongest initial study would be a controlled pilot on perhaps 10–20 speakers spanning several villages and both recording directories, using the existing eight target vowels. It should establish:
+
+- whether PC1/PC2 reproduce recognizable vowel separation;
+- correlations with Bark F1/F2;
+- sensitivity to recording source and spectral normalization;
+- whether 10–90% PC trajectories expose diphthongization more robustly than LPC;
+- whether the results remain stable under reasonable filter-bank and PCA choices.
+
+No repository changes were made during this assessment.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Agree on most; but we should not do all vowels. The interesting ones are the 8 base vowels that you can get from the inventory script.
+
+We can start with the following villages: bara, kårsta, östad and Piteå. They represent different dialect areas and should be 12 speakers. Btw, all speakers are male in this set (but swedia as a whole has women so later studies may target this).
+
+I went for the smaller config and created a venv swedia-pca with scipy matplotlib
+
+Would this be doable?</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Yes, this pilot is doable with the environment you created.
+
+I verified:
+
+- All 12 male speakers are present: three each from Bara, Kårsta, Östad, and Piteå.
+- Every recording has a corresponding TextGrid.
+- `swedia-pca` works with NumPy, SciPy, and Matplotlib.
+- The eight-vowel inventory is mostly complete.
+
+There are two coverage details:
+
+- All Kårsta and Piteå speakers lack the regular `låt /o:/` category, but have alternative `/o:/` tokens. We can use the inventory’s alternative-word mapping.
+- `ostad_ym_2` lacks `lat /ɑ:/` and has no inventory-approved alternative. That speaker would have seven of eight vowels.
+
+I suggest retaining `ostad_ym_2` rather than dropping the speaker. PCA works with individual spectral observations; it does not require every speaker to supply every vowel. We should simply mark that speaker-vowel cell as missing in summaries.
+
+The pilot can therefore use:
+
+- Exactly these 12 recordings.
+- The eight base vowel categories.
+- Base tokens plus the inventory-approved lexical alternatives.
+- Five measurements per vowel interval: 10%, 25%, 50%, 75%, and 90%.
+- A shared PCA fitted across the pilot data.
+- Speaker-balanced fitting by first averaging repetitions within speaker × vowel × time point, preventing speakers with more tokens from dominating.
+- Token-level projection afterward, preserving variation and uncertainty.
+- PC trajectories, midpoint vowel spaces, loading plots, scree plots, and comparison against existing F1/F2 results.
+
+One small environment detail: Matplotlib cannot write to its default configuration directory. The script should set:
+
+```python
+MPLCONFIGDIR=/tmp/swedia-pca-matplotlib
+```
+
+No additional libraries are required. SciPy provides WAV handling, resampling, windows, and numerical routines; NumPy provides PCA through SVD; Matplotlib covers the visualizations.
+
+The main implementation decision still worth making explicitly is the auditory filter definition. For a first pass, I recommend a reproducible triangular Bark filter bank with 20 bands through 21 Bark, plus a sensitivity run using the sex-specific 2–17 Bark range reported for male SweDia speakers. This lets us distinguish conclusions that are stable from ones dependent on an exact historical filter implementation.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>yes all good. ostad_ym_2 is known, but its good that it can be robust anyway. please go ahead</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Implemented and ran the Bark-spectrum PCA pilot.
+
+The new script is [analyze_bark_pca_pilot.py](/data/html/dev/swedia-formants-2026/analyze_bark_pca_pilot.py). Run it with:
+
+```bash
+swedia-pca/bin/python analyze_bark_pca_pilot.py
+```
+
+Results are in [Analyses/BarkPCA_pilot](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_pilot).
+
+Key results:
+
+- 12 male speakers across Bara, Kårsta, Östad, and Piteå.
+- Eight inventory vowel categories.
+- Approved alternative words included.
+- 620 vowel tokens.
+- Five measurements per token: 10%, 25%, 50%, 75%, and 90%.
+- PCA fitted to 475 speaker-balanced vowel/time observations.
+- `ostad_ym_2` retained with its missing `/ɑ:/`.
+- PC1–PC3 explain 48.9%, 20.5%, and 7.8% respectively—77.2% combined.
+- Six ambiguous annotations were excluded and documented.
+
+Outputs include:
+
+- [Midpoint vowel spaces](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_pilot/midpoint_vowel_spaces.png)
+- [Vowel trajectories](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_pilot/vowel_trajectories.png)
+- [PCA loading curves](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_pilot/loadings.png)
+- [Scree plot](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_pilot/scree.png)
+- [Token-level measurements](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_pilot/token_spectral_pca.csv)
+- [Balanced PCA data](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_pilot/balanced_speaker_vowel_time_pca.csv)
+- [Run configuration](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_pilot/run_settings.json)
+- [Excluded annotations](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_pilot/exclusions.csv)
+
+The initial plots show clear vowel organization and substantial dynamic movement, particularly for the back vowels. The implementation uses 20 triangular auditory filters centered at 1–20 Bark, 25 ms Hann windows, level-normalized spectral vectors, and a shared unrotated PCA. Compilation, the complete analysis run, numerical-finiteness checks, and output validation all passed.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>can you make a tiny single-file html viewer that basically lets us view pngs in the Analyses dir and below</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Created [Analyses/index.html](/data/html/dev/swedia-formants-2026/Analyses/index.html).
+
+Open it in a browser, click “Choose Analyses folder,” and select the `Analyses` directory. It provides:
+
+- Recursive PNG discovery
+- Path filtering
+- Folder-grouped file list
+- Previous/next buttons and arrow-key navigation
+- Fit/full-resolution toggle
+- Responsive layout
+
+It currently sees all 77 PNGs and will automatically include future images when the folder is selected again.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>no this lets me select a local folder but i want to view the pngs on this server in my browser</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Fixed [Analyses/index.html](/data/html/dev/swedia-formants-2026/Analyses/index.html).
+
+It now loads all 77 PNGs directly from their server-relative URLs—no local folder selection. Open the server URL corresponding to:
+
+```text
+/Analyses/index.html
+```
+
+Search, navigation, keyboard controls, and fit/full-size viewing remain available.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Very nice! I have reviewed the plots now. Vowels are in deed separated and roughly in the places we would expect. View is rotated compared to traditional f1/F2 plot but we&#x27;ll get back to that.
+
+I would like to see what happens if we use the inventory --strict-seg-label so surface targets are always the same. This would lead to fewer vowel tokens and incomplete vowel maps for more speakers. But   since targets are kept consistent it would be interesting to see if the acoustics will be that too. so add an option for that.
+
+I would also like to see traces of individual vowels. This lets us see the variation. Maybe in a lighter color and the mean thicker. add an option for that too</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Added both options to [analyze_bark_pca_pilot.py](/data/html/dev/swedia-formants-2026/analyze_bark_pca_pilot.py):
+
+```bash
+--strict-seg-label
+--individual-trajectories
+```
+
+I ran the combined configuration:
+
+```bash
+swedia-pca/bin/python analyze_bark_pca_pilot.py \
+  --strict-seg-label \
+  --individual-trajectories \
+  --output Analyses/BarkPCA_pilot_strict
+```
+
+The strict analysis retained:
+
+- 438 vowel tokens, compared with 620 previously.
+- 395 balanced PCA observations.
+- 77.5% combined variance in PC1–PC3, versus 77.2% previously.
+
+The trajectory plot now shows:
+
+- Individual token trajectories as faint colored lines.
+- Speaker-balanced village means as thicker lines.
+- Direction from 10% to 90%.
+
+See [the strict trajectory plot](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_pilot_strict/vowel_trajectories.png) and the other outputs in [BarkPCA_pilot_strict](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_pilot_strict).
+
+As expected, strict matching creates substantially more missing cells, particularly in Bara. Piteå retains all eight vowels for every speaker, while `ostad_ym_2` remains missing only `/ɑ:/`.
+
+I also added the four new plots to the server-side [PNG viewer](/data/html/dev/swedia-formants-2026/Analyses/index.html).</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ah, it would also be good to have individual plots for each speaker, even if the analysisnis done over the whole set. is that possible</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Added `--speaker-plots` to the PCA script.
+
+The strict pilot now contains 12 individual speaker plots in [BarkPCA_pilot_strict/speakers](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_pilot_strict/speakers).
+
+Each plot uses:
+
+- The PCA fitted over the complete 12-speaker set.
+- Shared axis limits for direct comparison.
+- Faint lines for individual token trajectories.
+- Thick lines for that speaker’s vowel means.
+- An explicit note listing missing vowel categories.
+
+They are also included in the [PNG viewer](/data/html/dev/swedia-formants-2026/Analyses/index.html).
+
+To reproduce:
+
+```bash
+swedia-pca/bin/python analyze_bark_pca_pilot.py \
+  --strict-seg-label \
+  --individual-trajectories \
+  --speaker-plots \
+  --output Analyses/BarkPCA_pilot_strict
+```</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>lets try more speakers. in Analyses/Combined... are plots from around 25 villages and 70 speakers. can you extract a list from that and use for a larger round. lets see the grand average per village, including surface target variations but without traces first</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Completed the larger analysis in [BarkPCA_24_villages](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_24_villages).
+
+It includes:
+
+- 73 speakers from 24 villages.
+- 3,557 vowel tokens.
+- All inventory-approved surface variants.
+- No individual traces.
+- One globally fitted PCA.
+- Speaker-balanced grand means for each village.
+- 2,885 PCA-fitting observations.
+- PC1–PC3 explaining 45.2%, 21.4%, and 9.3%—75.9% combined.
+
+Main visualizations:
+
+- [Village midpoint spaces](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_24_villages/midpoint_vowel_spaces.png)
+- [Village mean trajectories](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_24_villages/vowel_trajectories.png)
+- [PCA loadings](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_24_villages/loadings.png)
+- [Scree plot](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_24_villages/scree.png)
+
+Only seven of the possible 584 speaker–vowel cells are missing, including the known `ostad_ym_2 /ɑ:/` case. Every village still has coverage for all eight vowels through its other speakers.
+
+I added `--recordings-from-plots`, so this set is reproducible directly from the combined-plot directory:
+
+```bash
+swedia-pca/bin/python analyze_bark_pca_pilot.py \
+  --recordings-from-plots Analyses/CombinedSpeakerPlots_original_both_bark \
+  --output Analyses/BarkPCA_24_villages
+```
+
+The new plots are also available through [Analyses/index.html](/data/html/dev/swedia-formants-2026/Analyses/index.html).</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Great! Now if you look at the plots in Combined... again you will see that each file is a combo of two plots. Particularly, a few things are added to the right-hand plot
+
+1) arrows connecting certain vowel pairs, namely /u:/ ― /o:/, /o:/ ― /ɑ:/,  /ɑ:/ ― /æ:/, /æ:/ ― /e:/, /y:/ ― /ʉ̟:/,  /ʉ̟:/ ― /ø:/, so always going from the first to the second.
+
+2) midpoints on each arrow is calculated and indicated by a cross
+
+3) ellipses are fit to a) the vowel positions b) the midpoints. The major angle of the ellipses are printed in the plot
+
+The angles then become a sort of measure of the general direction of the vowel space. This is very rough but it still gives us a way to compare across villages. What is particularly attractive of being in PCA space is that everything is &#x27;normalized&#x27;
+
+Can you add these things to the plots?</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Added the requested geometry to the village midpoint plots:
+
+- Directed arrows for the six specified vowel pairs.
+- Crosses at each arrow midpoint.
+- A solid blue ellipse fitted to the eight vowel positions.
+- A dashed orange ellipse fitted to the six midpoints.
+- Signed major-axis angles printed in each panel’s legend.
+
+The measurements are also saved numerically in [village_pca_ellipses.csv](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_24_villages/village_pca_ellipses.csv), containing:
+
+- Village
+- Fit basis
+- Number of points
+- Centroid
+- Signed and unsigned angle
+- Major and minor axis standard deviations
+
+The updated overview is [midpoint_vowel_spaces.png](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_24_villages/midpoint_vowel_spaces.png). I also regenerated the original and strict four-village versions with the same overlays.
+
+The fits use two-standard-deviation ellipse outlines, matching the existing formant ellipse implementation. Coordinates remain in the shared global PCA space. They are level-normalized and directly comparable, although this does not remove every anatomical speaker difference in the stronger sense of speaker normalization.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>The plots are very nice, but i&#x27;m somewhat confused about the angle values. I seems that positive means pointing upwards (towards the upper right) and negative means pointing downwards (towards the lower right), and that a lower (absolute) value should mean &#x27;more vertical than horizontal&#x27; orientation. But some of the values do not seem right. Compare bara and n_rorum. To me it looks like bara is slightly more tilted upwards, but n_rorum has lower values. And ossjo appears very parallell with the horizontal axis, but has very low values. So can you have a look again.</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>You were right: the displayed geometry and reported angles were using inconsistent visual scales.
+
+Two issues were involved:
+
+- Angles were measured from the horizontal PC2 axis, where 0° means horizontal and ±90° means vertical. You expected deviation from vertical.
+- The plot did not use equal PC1/PC2 scaling, visually flattening the ellipses and making their apparent angles disagree with the calculations.
+
+I corrected both.
+
+The updated plots now:
+
+- Use equal scaling for PC1 and PC2.
+- Report signed deviation from vertical.
+- Use smaller absolute values for more vertical orientations.
+- Use positive values for upward-right tilt and negative values for downward-right tilt.
+- Flag orientations as unstable when the ellipse is nearly circular, using an axis-ratio threshold of 1.2.
+
+The examples now behave as expected:
+
+- Bara vowels: `+24.5° from vertical`
+- N. Rörum vowels: `+40.4° from vertical`
+
+Thus Bara is correctly reported as more vertical.
+
+For Össjö:
+
+- Vowel axis ratio: 1.13
+- Midpoint axis ratio: 1.05
+
+Those ellipses are too close to circular for a meaningful major-axis direction, so the plot now says “angle unstable” instead of reporting a misleading number.
+
+The updated plot is available at [midpoint_vowel_spaces.png](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_24_villages/midpoint_vowel_spaces.png), and the expanded numerical results are in [village_pca_ellipses.csv](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_24_villages/village_pca_ellipses.csv). I regenerated the four-village regular and strict plots with the same corrections.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Yes this is more interpretable. But it is now clear that the compression/expansion of the vowel space also plays a large part. We&#x27;ll get back to that.
+
+What now would be very useful is to visualise the angles vs villages&#x27; map coordinates. We have the x and y coordinates in columns 5 and 6 in resource.txt. so make a script that plots the villages at their coordinates and then visualises the Angels as color scale or similar, maybe one for the vowels and one for the midpoints.
+
+For unstable like ossjo and skinnskatteberg, we can just set to 0, right?</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Created [plot_pca_angle_maps.py](/data/html/dev/swedia-formants-2026/plot_pca_angle_maps.py) and generated:
+
+- [Combined vowel and midpoint maps](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_24_villages/village_angle_maps.png)
+- [Vowel-position angle map](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_24_villages/village_angle_map_vowels.png)
+- [Midpoint angle map](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_24_villages/village_angle_map_midpoints.png)
+
+The color scale represents signed deviation from vertical:
+
+- White: approximately vertical
+- Red: upward-right tilt
+- Blue: downward-right tilt
+- Stronger color: greater deviation from vertical
+
+I did not set unstable angles to zero because zero represents a meaningful, well-defined vertical orientation. Össjö and Skinnskatteberg are instead neutral gray with an × and asterisk, clearly distinguishing “orientation unavailable” from “vertical.”
+
+The maps use columns 5 and 6 from `resource.txt`, with the resource Y-axis inverted to give the intended geographic north–south orientation.
+
+Reproduce them with:
+
+```bash
+swedia-pca/bin/python plot_pca_angle_maps.py
+```
+
+All three maps are also included in the [browser viewer](/data/html/dev/swedia-formants-2026/Analyses/index.html).</pre>
+    </section>
+    </section>
+  </main>
+  <script>
+    const viewButtons = document.querySelectorAll('[data-view]');
+    const allMessages = document.querySelectorAll('.message');
+    let activeView = 'all';
+
+    function applyView(nextView) {
+      activeView = activeView === nextView ? 'all' : nextView;
+      allMessages.forEach((node) => {
+        const hideForConversation = activeView === 'conversation' &&
+          (node.classList.contains('thinking') || node.classList.contains('code'));
+        const hideForUser = activeView === 'user' && !node.classList.contains('user');
+        node.classList.toggle('is-hidden', hideForConversation || hideForUser);
+      });
+      viewButtons.forEach((viewButton) => {
+        viewButton.classList.toggle('is-active', viewButton.dataset.view === activeView);
+      });
+    }
+
+    document.querySelectorAll('.toolbar button').forEach((button) => {
+      button.addEventListener('click', () => {
+        if (button.dataset.target) {
+          const kind = button.dataset.target;
+          document.querySelectorAll(`details.${kind}`).forEach((node) => {
+            node.open = !node.open;
+          });
+          return;
+        }
+
+        if (button.dataset.view) {
+          applyView(button.dataset.view);
+        }
+      });
+    });
+  </script>
+</body>
+</html>
