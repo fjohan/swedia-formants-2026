@@ -685,6 +685,3359 @@ swedia-pca/bin/python plot_pca_angle_maps.py
 
 All three maps are also included in the [browser viewer](/data/html/dev/swedia-formants-2026/Analyses/index.html).</pre>
     </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>this is very nice! this needs more confirmation but there seems to be a vague tendency of angle changing in the north-south dimension. can you write up a rough draft of the methodology so far. mainly with pca details etc.</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>I wrote a methodology draft at [METHODOLOGY_DRAFT.md](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_24_villages/METHODOLOGY_DRAFT.md).
+
+It documents:
+
+- Sample and vowel selection
+- Base and alternative lexical targets
+- TextGrid-based token extraction
+- Five normalized measurement times
+- Windowing, FFT, Bark filter bank, and level normalization
+- Speaker-balanced PCA fitting
+- Centering, SVD, projection, and explained variance
+- Village averaging and trajectories
+- Arrow and midpoint construction
+- Covariance ellipses and angle convention
+- Axis-ratio reliability threshold
+- Geographic coordinate mapping
+- Limitations of treating PCA space as fully normalized
+- The tentative north–south observation
+- Reproduction commands
+- Priority robustness and inferential checks
+- References to Jacobi et al. and Leinonen
+
+I explicitly described the geographic tendency as exploratory and included vowel-space compression/expansion as a priority issue, since it affects both interpretation and angle stability.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok, can you make a script that randomly samples 30-35 villages so we get around 100 speakers. stratify according to y axis geographically. then run pca, arrow/angle analysis and plot as a map</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Created [run_stratified_bark_pca.py](/data/html/dev/swedia-formants-2026/run_stratified_bark_pca.py) and completed the larger run.
+
+The sampler:
+
+- Finds male recordings with matching WAV and TextGrid files.
+- Requires pooled coverage of all eight vowel categories within each village.
+- Orders eligible villages by the resource Y coordinate.
+- Divides them into five equal-count north–south strata.
+- Samples proportionally from every stratum.
+- Tries randomized samples until it approaches the requested speaker count.
+- Uses a fixed seed for reproducibility.
+- Runs the PCA, ellipse analysis, and geographic mapping automatically.
+
+The resulting sample contains:
+
+- 34 of 83 eligible villages
+- Exactly 100 speakers
+- 7, 7, 7, 6, and 7 villages across the five north–south strata
+- 4,798 vowel tokens
+- 23,990 token-time measurements
+- 3,915 balanced PCA rows
+- Complete vowel and midpoint ellipse fits for all 34 villages
+- PC1–PC3 explaining 76.8% combined variance
+- No unstable village ellipses in this sample
+
+Outputs are in [BarkPCA_stratified_34_seed20260903](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_stratified_34_seed20260903), including:
+
+- [Combined angle maps](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_stratified_34_seed20260903/village_angle_maps.png)
+- [Village vowel spaces](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_stratified_34_seed20260903/midpoint_vowel_spaces.png)
+- [Sampled villages](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_stratified_34_seed20260903/sampled_villages.tsv)
+- [Sampling configuration](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_stratified_34_seed20260903/sampling_settings.json)
+
+To reproduce:
+
+```bash
+swedia-pca/bin/python run_stratified_bark_pca.py
+```
+
+A different reproducible sample can be generated with:
+
+```bash
+swedia-pca/bin/python run_stratified_bark_pca.py \
+  --seed 12345 \
+  --villages 35 \
+  --target-speakers 100 \
+  --output Analyses/BarkPCA_stratified_35_seed12345
+```
+
+The new images are also listed in [Analyses/index.html](/data/html/dev/swedia-formants-2026/Analyses/index.html).</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Well i am not going to call victory yet, but tendency appear to hold across 5 reps in
+
+BarkPCA_stratified_35_seed12345[1-5]
+
+Of course with some exceptions.
+
+1) Could you perhaps add a correlation measurement to the plot?
+
+2) Lets expand the script so we can use arbitrary numbers of villages and speakers. Also add an option to allow for &#x27;partial&#x27; villages, so only 1 or 2 from the same village.
+
+3) And the html viewer could be updated so it auto-discovers stratified runs</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Implemented all three changes.
+
+1. Correlations on the maps
+
+Each angle map now reports, separately for vowel and midpoint ellipses:
+
+- Number of reliable villages
+- Pearson correlation between resource Y and angle
+- Two-sided Pearson p-value
+- Spearman rank correlation
+- Two-sided Spearman p-value
+
+Unstable orientations are excluded. The values are also saved in `angle_y_correlations.csv` inside every run directory.
+
+I found and corrected an important PCA sign issue: component signs are arbitrary between independent PCA runs. Components are now oriented reproducibly by requiring their largest absolute loading to be positive. After regenerating all five repetitions, their correlations have consistent directions.
+
+Across the five 35-village repetitions:
+
+- Vowel Pearson \(r\): −0.38 to −0.67
+- Midpoint Pearson \(r\): −0.36 to −0.69
+- Vowel Spearman \(\rho\): −0.51 to −0.73
+- Midpoint Spearman \(\rho\): −0.45 to −0.76
+
+Because resource Y increases southward, the negative relationship means angles tend to decrease toward the south under the canonical PCA orientation.
+
+These p-values remain descriptive: they do not account for spatial autocorrelation or repeated overlap among samples.
+
+2. Arbitrary sample sizes and partial villages
+
+[run_stratified_bark_pca.py](/data/html/dev/swedia-formants-2026/run_stratified_bark_pca.py) now accepts arbitrary valid village and speaker counts.
+
+For whole villages:
+
+```bash
+swedia-pca/bin/python run_stratified_bark_pca.py \
+  --villages 50 \
+  --target-speakers 150 \
+  --seed 123
+```
+
+The speaker count is treated as a target because all available speakers from each selected village are retained.
+
+For partial villages:
+
+```bash
+swedia-pca/bin/python run_stratified_bark_pca.py \
+  --villages 40 \
+  --target-speakers 73 \
+  --allow-partial-villages \
+  --seed 77
+```
+
+Partial mode:
+
+- Selects one or two speakers per village.
+- Reaches the requested speaker count exactly when feasible.
+- Ensures every selected village has at least one speaker.
+- Records both selected and available speaker counts in `sampled_villages.tsv`.
+
+A test produced exactly 40 villages and 73 speakers: seven villages with one speaker and 33 with two.
+
+Default output names are now derived automatically from village count, seed, and partial mode.
+
+3. Automatic viewer discovery
+
+The viewer now loads [png_manifest.json](/data/html/dev/swedia-formants-2026/Analyses/png_manifest.json), currently indexing 142 PNGs across all runs.
+
+Every completed stratified run automatically refreshes this manifest. For PNGs created by other means, refresh it manually with:
+
+```bash
+swedia-pca/bin/python update_analysis_png_manifest.py
+```
+
+The five existing repetitions and the 34-village analysis were regenerated with canonical PCA signs, correlation annotations, CSV statistics, and the updated viewer manifest.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Still, correlations in the 0.5-0.7 region with low p are pretty decent, aren&#x27;t they? Grain of salt, grain of salt...</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Yes—exploratorily, these are substantial and remarkably consistent correlations.
+
+Across repeated samples, absolute correlations around 0.5–0.7 suggest a meaningful north–south gradient, not merely a barely detectable tendency. The agreement between:
+
+- Pearson and Spearman correlations,
+- vowel-position and midpoint ellipses, and
+- five independently sampled village sets
+
+is particularly encouraging. It indicates that the result is not obviously driven by one outlying village, one ellipse definition, or one random sample.
+
+The grain of salt is that the five repetitions are not independent experiments: they draw from the same corpus and overlap in villages and speakers. Likewise, ordinary p-values assume independent observations, whereas geographically neighboring dialects are likely autocorrelated. The present p-values therefore probably overstate the independent evidence.
+
+So the fair conclusion is:
+
+&gt; The exploratory analyses reveal a moderately strong and reproducible association between north–south location and PCA vowel-space orientation. The pattern is robust across repeated stratified samples and two definitions of vowel-space orientation, but its statistical independence and sensitivity to recording, sampling, and spectral-analysis choices remain to be established.
+
+This is strong enough to justify proper confirmation. The next useful step would be one predeclared analysis of all eligible villages, with speaker-bootstrap uncertainty for each village and a spatially informed test of the Y–angle relationship.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>since we apparently can adjust/normalize the orientation of the plots/pca i wonder if we can have it another way? View is sort of &#x27;mirrored along the lower left-upper right&#x27; diagonal compared to traditional f1/F2 plot. check proto-wowels.png for a ref.</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Yes—the required transformation is:
+
+```text
+display x = −PC1
+display y = −PC2
+```
+
+This reflects the existing view across the lower-left–upper-right diagonal and produces a more traditional vowel-chart arrangement:
+
+- Front vowels toward the left
+- Back vowels toward the right
+- Higher vowels toward the top
+- Lower vowels toward the bottom
+
+I added parallel outputs:
+
+- [Traditional midpoint spaces](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_stratified_34_seed20260903/midpoint_vowel_spaces_traditional.png)
+- [Traditional trajectories](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_stratified_34_seed20260903/vowel_trajectories_traditional.png)
+
+The original raw-PC plots remain available.
+
+This is strictly an orthogonal display transformation. It preserves:
+
+- Distances between vowels
+- Trajectory lengths
+- Ellipse area and axis ratio
+- PCA loadings and explained variance
+- Relative acoustic relationships
+
+It changes the reported orientation angle because “vertical” now refers to a different displayed PC axis. For now, the geographic maps and correlations continue to use the canonical raw PCA coordinates, preserving comparability with the existing results. If we decide that orientation relative to a traditional vowel chart is the linguistically meaningful measurement, we should deliberately transform the angle analysis and regenerate the maps rather than silently mixing the two conventions.
+
+Future PCA runs now generate both orientations automatically, and the viewer manifest includes the new plots.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>yes i think we should change the orientation to be compared with so that it fits the traditional vowel chart. it goes along the horizontal axis now, right?</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Yes. The orientation measure is now relative to the horizontal axis:
+
+- `0°` = horizontal
+- positive = rises toward the right
+- negative = falls toward the right
+
+The primary plots now use traditional vowel-chart orientation:
+
+- `x = −PC1`
+- `y = −PC2`
+- front vowels left, back vowels right
+
+Raw `PC2 × PC1` versions are retained as `*_raw.png`. I regenerated all existing stratified runs, updated the maps and CSV fields, refreshed the HTML manifest, and verified that the transformation preserves the previous correlations exactly.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>great! i also propose that we reverse the color scheme for the map plots so that positive are blue and negative are red. this is a play on temperature, where hot is usually associated with red. since the south tends to have more negative values is will be more red which also fits with that it usually gets hotter in the south.</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Done. The map palette is now reversed:
+
+- Negative angles → red
+- Zero → neutral grey
+- Positive angles → blue
+
+I regenerated all existing PCA map plots and refreshed the HTML viewer manifest. The temperature/geographic interpretation now reads naturally, with southern negative-angle locations tending toward warmer colors.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>can we rerun on the 24 villages in Combined...? I don&#x27;t think thats been done since its not &#x27;stratified&#x27;</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Rerun complete. The 24 villages and 73 speakers were re-extracted from `CombinedSpeakerPlots_original_both_bark`.
+
+Updated results are in [BarkPCA_24_villages](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_24_villages), including:
+
+- Traditional vowel-chart orientation
+- Horizontal-reference ellipse angles
+- Reversed temperature color scale
+- Raw-orientation comparison plots
+- Regenerated map correlations
+- Refreshed HTML viewer manifest
+
+Current reliable-village correlations:
+
+- Vowels: Pearson `r = −0.81`, Spearman `ρ = −0.85` (`n = 22`)
+- Midpoints: Pearson `r = −0.74`, Spearman `ρ = −0.77` (`n = 22`)</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>in media+sound there seems to be wavs from 105 different villages, in resource.txt 104 villages are listed. in TextGrid there seems to be textgrids from 92 different villages. but we only have 83 villages available. survey which ones are not used and assess why. missing textgrid is an obvious reason but maybe there is more usable material that we have missed, because only one speaker, poor vowel inventory etc. please investigate.</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>The current total of 83 eligible villages is correct under the existing rules.
+
+Of the 104 villages in `resource.txt`:
+
+- 83 have exact WAV–TextGrid matches and pooled coverage of all eight vowel targets.
+- 11 have no TextGrid.
+- 2 have TextGrids but empty or unusable segment tiers.
+- 8 have incomplete pooled vowel coverage.
+
+There is no three-speaker requirement. Two eligible villages use only one recording (`grangarde`, `houtskar`), and three use two recordings (`burseryd`, `lanna`, `skuttunge`).
+
+The apparent file-count discrepancy is also explained:
+
+- 106 WAV filename stems
+- Minus `referens`, which is not a village
+- Gives 105 geographic WAV stems
+- `skillingmark` is the one geographic WAV stem absent from `resource.txt`
+- I find 93 TextGrid village stems rather than 92; this includes multipart Orsa filenames
+
+The most promising recovery is Fole. It has 7/8 vowels, and all 14 missing `/ʉ̟ː/` target tokens are present as `lus`, but their segment is labeled `dift`. We could potentially recognize `dift` as a vowel-like interval after inspecting whether its boundaries are acoustically appropriate. That would raise eligibility from 83 to 84.
+
+Other exclusions require more substantive data:
+
+- `delsbo`, `snappertuna`: segment tiers are empty.
+- `husby`: segment coverage is seriously incomplete.
+- `alvdalen`, `munsala`, `orsa`, `sarna`, `vindeln`, `vora`: one or more required lexical targets are absent from the available annotated word lists.
+- Eleven villages have no TextGrid at all.
+
+I added a reproducible audit script and full reports:
+
+- [audit_pca_village_eligibility.py](/data/html/dev/swedia-formants-2026/audit_pca_village_eligibility.py)
+- [PCA_VILLAGE_ELIGIBILITY_AUDIT.md](/data/html/dev/swedia-formants-2026/Analyses/PCA_VILLAGE_ELIGIBILITY_AUDIT.md)
+- [pca_village_eligibility_audit.csv](/data/html/dev/swedia-formants-2026/Analyses/pca_village_eligibility_audit.csv)</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>i updated the png_manifest.json file but index-html viewer still shows all files. how does it work if i want to remove some images?</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>The issue was a trailing comma in `png_manifest.json`, making it invalid JSON. The viewer then silently used its old embedded list containing all images.
+
+I fixed the comma and changed the viewer so the manifest is authoritative. It now contains 20 valid entries. Reload the page—use a hard refresh if it is already open.
+
+To remove an image, delete its line from [png_manifest.json](/data/html/dev/swedia-formants-2026/Analyses/png_manifest.json), ensuring:
+
+- Entries except the last end with a comma.
+- The final entry has no comma.
+- The surrounding `[` and `]` remain.
+
+One caveat: `update_analysis_png_manifest.py` discovers every PNG again. For permanent exclusions, create `Analyses/png_manifest_exclude.txt` with one glob per line, for example:
+
+```text
+CombinedSpeakerPlots_original_both_bark/*
+*/midpoint_vowel_spaces_raw.png
+BarkPCA_pilot_strict/speakers/*
+```
+
+Then rerun:
+
+```bash
+./swedia-pca/bin/python update_analysis_png_manifest.py
+```
+
+The updater now respects those exclusion patterns.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>should we add a plot with stdev ellipses to each trajectory point of each village? or is there any other way to view variation?</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Yes, but five full ellipses per vowel would produce up to 40 overlapping ellipses in each village panel and likely become difficult to read.
+
+I would use two complementary plots:
+
+- Trajectory plot: keep the mean trajectories, adding small semi-transparent covariance ellipses at 10%, 50%, and 90% only. Each ellipse should represent variation among speaker-level means, not all tokens pooled, so speakers with many repetitions do not dominate.
+- Midpoint variability plot: show all eight vowels at 50% with one 1-SD ellipse per vowel. This is the clearest view of how stable each vowel category is and where categories overlap.
+
+For the trajectory plot, another good option is a translucent ribbon perpendicular to the mean path. That displays dispersion continuously while creating less clutter, but it is slightly harder to explain methodologically than ellipses.
+
+Important distinctions:
+
+- Ellipses in 2D PCA space show covariance, not independent x/y standard deviations.
+- With only one or two speakers, a speaker-level ellipse cannot be estimated reliably. Those should instead show individual speaker points or paths.
+- A 1-SD covariance ellipse is useful descriptively but does not contain exactly 68% of observations in two dimensions. If we want a probability interpretation, use a 68% or 95% chi-square-scaled ellipse and label it accordingly.
+- Token-level and speaker-level variation answer different questions. For dialect comparison, speaker-level variation should be primary; faint token trajectories can remain an optional diagnostic.
+
+My preference would be:
+
+1. Add a new `midpoint_vowel_variation.png` with speaker points and 68% covariance ellipses.
+2. Add an option such as `--trajectory-ellipses` that places lighter 68% ellipses at 10%, 50%, and 90%.
+3. Keep the current clean trajectory plot as the default.
+
+This would show variation without sacrificing the readability of the village maps.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok lets add new midpoint variation plot</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Added `midpoint_vowel_variation.png` to every existing Bark PCA analysis.
+
+Each village panel now shows:
+
+- Small translucent points: individual speaker means at the 50% vowel midpoint
+- Large outlined points: village means
+- Colored regions: 68% bivariate covariance ellipses
+- No ellipse where fewer than three speaker observations are available
+
+The ellipses use the traditional `−PC1 × −PC2` orientation. With only three speakers, some ellipses are naturally very narrow, which accurately signals that their covariance estimate is uncertain.
+
+The new plots were also added to the curated HTML viewer manifest. The implementation is now part of [analyze_bark_pca_pilot.py](/data/html/dev/swedia-formants-2026/analyze_bark_pca_pilot.py), so future runs will create them automatically.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>yes, lets try adding a vowel space ellips to those as well. it should be fitted to all the means of all vowels. do not calc halfway points and do an ellips for that. and then angle calculation and drawn vs map coordinated, correlation etc. do not run this on all the old ones, i just want to see how it works.</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Implemented as a trial on only the 24-village dataset.
+
+The new overall dashed ellipse is fitted to every speaker-level vowel mean at the 50% point. No arrow midpoints are calculated or included.
+
+New outputs:
+
+- `midpoint_vowel_variation_overall_ellipse.png`
+- `village_pca_variation_ellipses.csv`
+- `village_variation_angle_map.png`
+- `variation_angle_y_correlation.csv`
+
+Results across the 24 villages:
+
+- Pearson: `r = −0.65`, `p = 0.000616`
+- Spearman: `ρ = −0.67`, `p = 0.000313`
+- All 24 overall ellipses passed the current axis-ratio reliability threshold.
+
+Both trial images are included in the curated viewer. Future analyses can generate the overall ellipse automatically, but I did not apply it to the older runs.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Ah we could have village_variation_angle_map.png as an option to run_stratified_bark_pca.py</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Added the option:
+
+```bash
+./swedia-pca/bin/python run_stratified_bark_pca.py \
+  --villages 35 \
+  --target-speakers 100 \
+  --seed 12345 \
+  --variation-angle-map
+```
+
+When enabled, the run additionally produces:
+
+- `midpoint_vowel_variation.png` with the overall speaker-vowel-means ellipse
+- `village_pca_variation_ellipses.csv`
+- `village_variation_angle_map.png`
+- `variation_angle_y_correlation.csv`
+
+The option is recorded in `sampling_settings.json`. Without `--variation-angle-map`, the overall ellipse metrics are still generated, but the additional geographic map and correlation file are omitted.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Actually i think a better way may be to do it for individual speakers and dont average over villages</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Yes—this is a cleaner speaker-level analysis. I changed the optional variation analysis accordingly.
+
+For each speaker it now:
+
+- Uses the speaker’s eight vowel means at 50%.
+- Fits one vowel-space ellipse to those eight positions.
+- Requires all eight vowels; incomplete speaker maps are excluded.
+- Calculates the ellipse angle independently.
+- Draws speakers separately at slightly offset village coordinates.
+- Does not average angles within villages.
+- Does not calculate arrow midpoints.
+
+For the 24-village trial:
+
+- 66 of 73 speakers had all eight vowels.
+- 62 of those had reliable ellipse orientation.
+- Pearson `r = −0.63`
+- Spearman `ρ = −0.66`
+- Village-clustered permutation `p = 0.0001` for both
+
+The clustered permutation test keeps speakers separate but avoids treating speakers from the same village as geographically independent.
+
+The trial plots are in the viewer, including `midpoint_vowel_variation_speaker_ellipses.png`. Future stratified runs can request this with:
+
+```bash
+./swedia-pca/bin/python run_stratified_bark_pca.py \
+  ... \
+  --variation-angle-map
+```
+
+That produces `speaker_pca_ellipses.csv`, `village_variation_angle_map.png`, and `variation_angle_y_correlation.csv`.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Ok, check
+
+Analyses/BarkPCA_stratified_50_seed1234518/village_variation_angle_map.png
+
+I think there still is a tendency. Correlation is lower, but maybe the north-south dimension isnt the best
+
+Whats your assessment?</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>I agree there is still a geographic tendency, but it is better described as a broad gradient with substantial local and speaker variation—not a clean north–south division.
+
+For this run:
+
+- 83 villages and 250 sampled speakers, despite the directory name containing `50`
+- 225 speakers had complete eight-vowel maps
+- 217 had reliable ellipse orientations
+- North–south: Pearson `r = −0.36`, Spearman `ρ = −0.46`
+- Village-clustered permutation `p = 0.0001`
+
+The lower speaker-level correlation is expected. The earlier village ellipses suppress within-village variability; individual-speaker ellipses retain it. A moderate correlation surviving that additional variation is arguably more informative.
+
+I tested the east–west dimension too:
+
+| Geographic predictor | Pearson | Spearman |
+|---|---:|---:|
+| North–south (`y`) | −0.36 | −0.46 |
+| East–west (`x`) | +0.30 | +0.32 |
+
+So north–south remains the stronger single axis. However, east–west contributes something: positive angles occur somewhat more often toward the north and east, suggesting a diagonal southwest–northeast gradient.
+
+A joint linear model using both coordinates gives:
+
+- In-sample `R² = 0.154`
+- Leave-one-village-out `R² = 0.113`
+- Held-out prediction correlation `r = 0.34`
+
+North–south alone explains about 13% of speaker-level variance, so adding longitude improves the fit only modestly. The optimized direction is still predominantly north–south, tilted toward a southwest–northeast axis.
+
+My assessment is therefore:
+
+- The tendency is unlikely to be purely accidental.
+- It is not adequately summarized as latitude alone.
+- A diagonal geographic gradient is slightly better.
+- Most variation remains unexplained, including meaningful differences among speakers in the same village.
+- The tiny permutation p-value establishes repeatability under village-level reshuffling, not a strong effect or a causal geographic explanation.
+- Spatial autocorrelation and regional clustering still need explicit treatment before making inferential claims.
+
+The next useful visualization would be a fitted two-dimensional spatial surface over `x` and `y`, with the observed speaker points overlaid. I would start with a simple linear plane, then compare it with a gently smoothed surface using village-level cross-validation. That would reveal whether the apparent pattern is genuinely diagonal or consists of separate regional pockets.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Someone else ran a gamm like this on the data. I think they used some kind of reference level for the vowels and basically measured if distance from the place of the reference (likely central Swedish, close to Kårsta) affected distance of vowels. What do you make of this?
+
+Formula:
+distance ~ ipa + s(subject, bs = &quot;re&quot;) + s(Longitude, Latitude, 
+    bs = &quot;ts&quot;, k = 10)
+
+Parametric coefficients:
+            Estimate Std. Error z value Pr(&gt;|z|)    
+(Intercept)  0.96529    0.05611  17.204  &lt; 2e-16 ***
+ipaÉ‘:       -0.46106    0.06189  -7.450 9.33e-14 ***
+ipae:       -0.30107    0.06144  -4.900 9.57e-07 ***
+ipao:       -0.17817    0.06189  -2.879  0.00399 ** 
+ipaÃ¸:        0.14055    0.06166   2.279  0.02264 *  
+ipau:        0.61388    0.06166   9.956  &lt; 2e-16 ***
+ipaÊ‰ÌŸ:        0.24179    0.06166   3.921 8.81e-05 ***
+ipay:       -0.07769    0.06189  -1.255  0.20938    
+---
+Signif. codes:  0 â€˜***â€™ 0.001 â€˜**â€™ 0.01 â€˜*â€™ 0.05 â€˜.â€™ 0.1 â€˜ â€™ 1
+
+Approximate significance of smooth terms:
+                        edf Ref.df Chi.sq  p-value    
+s(subject)            2.108      3  14.17 0.000341 ***
+s(Longitude,Latitude) 1.706      9  14.20 0.000265 ***
+---
+Signif. codes:  0 â€˜***â€™ 0.001 â€˜**â€™ 0.01 â€˜*â€™ 0.05 â€˜.â€™ 0.1 â€˜ â€™ 1
+
+R-sq.(adj) =  0.381   Deviance explained = 31.1%
+-REML = 299.38  Scale est. = 1         n = 550</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>The model is sensible as a first geographic test, but the output does not itself show that Kårsta is the geographic reference. That reference must have been introduced when the response variable `distance` was calculated.
+
+The omitted IPA level is `/æː/`, because coefficients are printed for the other seven vowels. Thus `/æː/` is the factor’s statistical reference level—not a reference village.
+
+The model asks:
+
+&gt; After accounting for systematic differences among vowels and subjects, does acoustic distance vary geographically?
+
+Its spatial result is fairly convincing:
+
+- Spatial smooth: `p = 0.000265`
+- Effective degrees of freedom: `1.706`
+- Adjusted `R² = 0.381`
+- Deviance explained: `31.1%`
+
+An EDF of only 1.7 means the fitted geographic pattern is fairly simple—closer to a broad plane or gentle bend than a complicated patchwork. That agrees rather well with our impression of a broad geographic gradient.
+
+The IPA coefficients do not describe geographical effects. They describe how large the calculated reference distance is for each vowel relative to `/æː/`, averaged over geography. For example:
+
+- `/uː/` is about `0.61` units farther from its reference than `/æː/`.
+- `/ɑː/` is about `0.46` units closer.
+- `/yː/` does not differ clearly from `/æː/`.
+
+How those should be interpreted depends entirely on how `distance` was defined and scaled.
+
+Important limitations
+
+1. One common geographic surface is fitted for all vowels.
+
+The formula assumes geography affects every vowel’s distance in the same way:
+
+```r
+distance ~ ipa + s(subject, bs=&quot;re&quot;) +
+  s(Longitude, Latitude, bs=&quot;ts&quot;, k=10)
+```
+
+It cannot detect, for example, `/uː/` changing strongly geographically while `/eː/` remains stable. For vowel-specific geography, it would need an interaction such as separate spatial smooths by vowel.
+
+2. Distance discards direction.
+
+Two vowels can be equally distant from the Kårsta reference while moving in opposite directions in PCA space. Our ellipse-angle measure preserves some directional organization of the vowel system; scalar distance does not. The analyses therefore answer different questions and complement one another.
+
+3. Distance from a single reference may confound reference choice with geography.
+
+If Kårsta is the acoustic reference, nearby places may be expected to resemble it partly because dialect similarity is spatially autocorrelated. Trying several defensible reference locations—or using distance from a central Swedish multi-speaker centroid—would establish robustness.
+
+4. The subject term deserves checking.
+
+This output reports:
+
+```text
+s(subject) edf = 2.108, Ref.df = 3
+```
+
+That looks like only about four subject levels. With `n = 550`, I would expect many more if `subject` means individual speaker. It may instead encode speaker type or another four-level variable, or it may have been constructed incorrectly. If repeated vowel observations belong to roughly 70 speakers, the speaker identifier should be a factor with roughly that many levels. This is the first thing I would verify.
+
+5. The family and distance metric matter.
+
+The `z` statistics and fixed scale estimate of 1 make me want to inspect the full model call, including `family=...`. Euclidean distances are positive and often right-skewed, so residual diagnostics are important.
+
+My overall reading is that this provides independent support for geographically structured vowel divergence. It does not establish that north–south is the correct axis, because the two-dimensional smooth is free to find a diagonal surface. Its low EDF actually suggests that extracting and plotting the fitted spatial plane would be particularly informative.
+
+The most useful next checks would be:
+
+- Plot the fitted spatial smooth.
+- Confirm what `subject` contains.
+- Document exactly how the reference vowel coordinates and distance were calculated.
+- Compare Kårsta against a multi-speaker central-Swedish reference.
+- Test whether vowel-specific spatial smooths improve prediction.
+- Compare the spatial distance surface with our individual-speaker ellipse-angle surface.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Yes there are issues with this. But maybe we can explore &#x27;distance from Kårsta&#x27; instead of north-south as a dimension and check that against the angles?</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Yes, there is an association with distance from Kårsta, but it is weaker than the north–south relationship.
+
+For the 217 reliable speakers across 82 villages:
+
+- Pearson `r = −0.23`, village-clustered permutation `p = 0.0084`
+- Spearman `ρ = −0.25`, village-clustered permutation `p = 0.0054`
+- Linear `R² = 0.054`
+- Descriptive quadratic `R² = 0.089`
+
+So angles tend to become more negative farther from Kårsta, but distance explains only about 5% of speaker variation. The scatterplot also shows substantial dispersion.
+
+The central problem is that radial distance loses direction. A village 150 coordinate units north of Kårsta is treated identically to one 150 units south, even though our map suggests those directions behave differently. In this dataset:
+
+- North–south correlation: `r = −0.36`
+- East–west correlation: `r = +0.30`
+- Distance from Kårsta: `r = −0.23`
+
+Thus distance from Kårsta is meaningful, but it does not appear to be the best geographic dimension for angle. The significant result may partly arise because most distant sampled locations lie north or south rather than being distributed evenly around Kårsta.
+
+The new diagnostic is available as `angle_vs_distance_from_karsta.png` in the viewer. I also added the reusable [plot_angle_vs_reference_distance.py](/data/html/dev/swedia-formants-2026/plot_angle_vs_reference_distance.py).
+
+A stronger next model would retain both distance and direction from Kårsta—for example:
+
+```text
+angle ~ distance + north/south bearing + east/west bearing
+```
+
+Or simply use the two map coordinates together. That would tell us whether Kårsta-centered distance contributes after accounting for geographic direction.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok run that</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>The Kårsta-centered distance-plus-direction model performs noticeably better.
+
+Using 217 reliable speakers across 82 villages:
+
+| Model | In-sample R² | Leave-one-village-out R² |
+|---|---:|---:|
+| Distance only | 0.054 | 0.020 |
+| Bearing only | 0.153 | 0.113 |
+| Map `x + y` | 0.154 | 0.113 |
+| Distance + bearing | **0.226** | **0.180** |
+
+For the combined model:
+
+- Held-out Pearson correlation: `r = 0.43`
+- Held-out Spearman correlation: `ρ = 0.49`
+- Village-clustered permutation: `p = 0.0001`
+
+The standardized effects are:
+
+- Distance from Kårsta: `−4.22`
+- East–west bearing: `+0.99`
+- North–south bearing: `−6.06`
+
+Because resource `y` increases southward, the last coefficient means southward locations tend toward more negative angles. East–west direction contributes relatively little after distance and north–south direction are included.
+
+My assessment: distance from Kårsta is informative, but only when direction is retained. Radial distance alone is a poor geographic summary. The combined Kårsta-centered representation improves held-out explained variance from roughly 11% for ordinary coordinates to 18%, which is a meaningful improvement. It should still be treated as exploratory because Kårsta was chosen as a substantively interesting reference rather than preregistered.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Another thing: im quite sure the model above used formants instead of PCA values. While im quite happy with the pca, it might be worth moving to actual acoustics.
+
+This leads to the question
+
+a) can we map or PCA values to formant values? The &#x27;combined&#x27; plots are based on formant values, these could be used to learn a mapping, as far as this is possible
+
+b) or is it better to use the pca to inform the formant analysis and use it to check for spurious values, set threshold/pathing values</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>PCA spectra are already “actual acoustics”; formants are a more theory-driven reduction of those acoustics. For the main phonetic interpretation, however, I agree that directly measured F1/F2 would be preferable, with PCA serving as an independent robustness and quality-control analysis.
+
+## A. Mapping PCA scores to formants
+
+This is feasible. I matched the 24-village PCA data against the Fast Track Bark-formant medians retained from the combined plots:
+
+- 574 matched speaker–vowel observations
+- 73 speakers
+- 24 villages
+
+The raw associations confirm our chosen PCA orientation:
+
+| PCA component | F1 | F2 |
+|---|---:|---:|
+| PC1 | `r = 0.31` | `r = 0.80` |
+| PC2 | `r = 0.84` | `r = −0.41` |
+| PC3 | approximately zero | approximately zero |
+
+Thus PC1 is primarily related to F2 and PC2 primarily to F1, though neither relationship is completely pure.
+
+Under leave-one-village-out validation:
+
+| Predictors | F1 R² | F2 R² |
+|---|---:|---:|
+| PC1 + PC2 | 0.803 | 0.795 |
+| PC1–PC3 | 0.803 | 0.793 |
+| Vowel identity only | 0.715 | 0.824 |
+| PC1 + PC2 + vowel | **0.876** | **0.865** |
+
+PC3 adds essentially nothing. The mapping is strong, but the vowel-only result is important: some of the apparent predictability simply reflects the eight vowel categories occupying predictable locations. Nevertheless, adding PC1 and PC2 to vowel identity improves both formants substantially.
+
+A calibrated PCA plot in approximate Bark-F1/F2 units is therefore possible. But it would predict the output of the formant tracker—it would not independently recover “true” formants. Tracker errors in the training data would become part of the mapping.
+
+## B. PCA-informed formant tracking
+
+This is the stronger use of the relationship.
+
+I would recommend:
+
+1. Treat directly tracked F1/F2 as the primary interpretable measurements.
+2. Retain several LPC ceiling/path candidates for each token.
+3. Predict approximate F1/F2 from the Bark spectrum or PC1/PC2.
+4. Score each LPC candidate according to:
+
+   - Agreement with the spectrum-derived prediction
+   - Track continuity through time
+   - Plausible bandwidths
+   - Absence of F1/F2 crossings
+   - Agreement between Praat and Fast Track
+   - Whether the optimum repeatedly hits the lowest or highest ceiling
+
+5. Select the best trajectory through time, or flag the token if no candidate is convincing.
+6. Validate the procedure against manually inspected tokens, leaving entire speakers and dialect regions out during testing.
+
+For diphthongized vowels, this should operate at several time points rather than only on midpoint medians. A path-selection procedure could use the PCA trajectory to distinguish genuine vowel movement from an LPC track jumping between resonances.
+
+Crucially, PCA disagreement should be a warning signal, not an automatic exclusion rule. Spectral PCA reflects more than F1/F2—fundamental frequency, spectral tilt, higher resonances, nasalization, and recording conditions can all affect it.
+
+## Recommendation
+
+I would not replace PCA coordinates with mapped pseudo-formants for the main analysis. Instead:
+
+- Run the geographic ellipse-angle analysis directly in Bark F1/F2 space.
+- Run the same analysis independently in PCA space.
+- Use PCA-informed residuals to detect and possibly resolve dubious LPC results.
+- Report whether the geographic result survives across both representations.
+
+The immediate limitation is that only speaker–vowel formant medians survive for the 24-village combined set. The original token-level `token_comparison.csv` and formant tracks are no longer present in `Analyses`, and the current environment lacks Parselmouth/Fast Track. A full corpus rerun would require restoring the formant environment or installing those packages.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok so for PCA-informed formant tracking we need praat, parselmouth and maybe fasttrack. fasttrack is essentually a correcting procedure in its own and can take considerable time. since pca is used here also as a correcting procedure, do we need fasttrack?</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>No, Fast Track is not required.
+
+For a PCA-informed tracker, the minimal stack is:
+
+- Parselmouth, which provides Praat’s Burg formant analysis from Python
+- NumPy/SciPy for spectral PCA, scoring, and path selection
+- Matplotlib for diagnostics
+
+You generally do not need a separate Praat installation: Parselmouth embeds/accesses the relevant Praat functionality.
+
+A sensible procedure would be:
+
+1. Run Praat Burg repeatedly over a modest grid of candidate ceilings, perhaps 4500–6500 Hz for these male speakers.
+2. Extract F1/F2, bandwidths, and continuity information for every candidate.
+3. Predict approximate F1/F2 from PC1/PC2 or directly from the Bark-band spectrum.
+4. Choose the candidate or time-varying path that balances:
+
+   - Agreement with the spectral prediction
+   - Smooth formant trajectories
+   - Reasonable bandwidths
+   - No formant crossings
+   - Limited jumping between LPC ceilings
+
+This overlaps conceptually with Fast Track, but it would be narrower and specifically informed by our spectral PCA. It should also be faster if we evaluate fewer ceilings and only F1/F2.
+
+Fast Track would still be valuable as:
+
+- An external comparison method
+- A benchmark for our selector
+- A fallback for tokens where Praat/PCA selection remains uncertain
+
+It need not be part of every production run.
+
+The main methodological concern is avoiding circular validation. PCA and LPC are derived from the same signal, so agreement between them is not independent proof of correctness. We should validate the selector against a manually reviewed subset and compare:
+
+- Fixed-ceiling Praat
+- Fast Track
+- PCA-informed Praat selection
+
+My recommendation is to begin without Fast Track in the production pipeline. Use Parselmouth to generate several Burg candidates, build the PCA-informed selection method, and run Fast Track only on the validation sample. If our simpler method performs comparably there, Fast Track can remain optional.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok so praat-parselmouth is the only additional thing we need</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Yes. For the proposed PCA-informed formant analysis, the only additional Python dependency is:
+
+```bash
+./swedia-pca/bin/pip install praat-parselmouth
+```
+
+The existing environment already has NumPy, SciPy, and Matplotlib. Parselmouth includes access to Praat’s Burg analysis, so a separate Praat installation is not required.
+
+Fast Track can remain optional for later benchmarking against a manually reviewed subset.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok installed. so i think you can go ahead with a pca informed formant analysis</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>A working PCA-informed Praat pilot is now implemented in [analyze_pca_informed_formants.py](/data/html/dev/swedia-formants-2026/analyze_pca_informed_formants.py).
+
+It:
+
+- Learns a PC1/PC2-plus-vowel calibration to Bark F1/F2 from the 24-village combined data.
+- Runs Praat Burg at nine ceilings from 4500–6500 Hz.
+- Measures five points through every vowel.
+- Scores candidates using PCA agreement, trajectory smoothness, and bandwidth.
+- Preserves every candidate and its score.
+- Flags edge-ceiling selections and large PCA residuals.
+
+The three-recording pilot analyzed 149 tokens in about six seconds. Compared with retained Fast Track medians:
+
+| Method | F1 RMSE | F2 RMSE |
+|---|---:|---:|
+| PCA-informed selection | 0.334 Bark | 0.594 Bark |
+| Fixed 5500-Hz Praat | 0.346 Bark | 0.589 Bark |
+
+So it currently performs approximately the same as fixed Praat—not yet demonstrably better. Also, 45 of 149 tokens selected an edge ceiling, which is a warning that the scoring or ceiling range needs validation before a corpus run.
+
+Outputs are in [PCAInformedFormants_pilot](/data/html/dev/swedia-formants-2026/Analyses/PCAInformedFormants_pilot):
+
+- `candidate_formant_tracks.csv`
+- `candidate_scores.csv`
+- `selected_formant_tracks.csv`
+- `calibration_and_settings.json`
+- `selected_vowel_spaces.png`
+
+The plot is included in the HTML viewer. I recommend manually reviewing a stratified sample of edge-ceiling choices before scaling this up; at present, it should be considered an auditable candidate-selection experiment, not a validated correction procedure.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Hmm that result is actually a little concerning. Maybe what we should try is to compare a) pca-only and b) praat-only on the angle vs north-south hypothesis. So maybe a script similar to
+
+run_stratified_bark_pca.py
+
+where we calculate vowel spaces independently with both methods, calculate ellipses and plot the angles vs coordinates to test if the north-south hypothesis essentially gives the same result for both methods</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>The paired pipeline is implemented, and the first 24-village comparison does not show equivalent results across methods.
+
+| Method | Reliable speakers | Pearson r | Cluster p | Spearman ρ | Cluster p |
+|---|---:|---:|---:|---:|---:|
+| Bark PCA | 62 | −0.63 | 0.0001 | −0.66 | 0.0001 |
+| Praat 5500 Hz | 66 | −0.01 | 0.933 | −0.18 | 0.226 |
+| Existing Fast Track | 64 | −0.22 | 0.121 | −0.29 | 0.035 |
+
+Thus the strong PCA association does not replicate in fixed-ceiling Praat. Fast Track shows a weaker tendency, principally in the rank correlation.
+
+The Praat and PCA speaker angles also agree poorly:
+
+- Pearson agreement: `r = 0.17`
+- Spearman agreement: `ρ = 0.32`
+- Median absolute angular difference: `10.4°`
+
+A major reason is axis scaling. Praat Bark-formant angles occupy only about `−18°` to `+7°`, whereas PCA angles span approximately `−54°` to `+40°`. F2 dispersion dominates the unstandardized Bark formant space, making most Praat ellipses nearly horizontal. Ellipse angle is inherently sensitive to relative x/y scaling.
+
+The new runner option is:
+
+```bash
+./swedia-pca/bin/python run_stratified_bark_pca.py \
+  --villages 35 \
+  --target-speakers 100 \
+  --seed 12345 \
+  --praat-comparison
+```
+
+Optional ceiling:
+
+```bash
+--praat-ceiling 5500
+```
+
+It produces:
+
+- PCA speaker-angle map and correlation
+- `praat_token_formants.csv`
+- `praat_speaker_vowel_means.csv`
+- `praat_speaker_ellipses.csv`
+- `praat_village_angle_map.png`
+- `praat_angle_y_correlation.csv`
+
+Praat uses the same lexical tokens and boundaries but does not use PCA to select, correct, or exclude formants.
+
+The trial maps for PCA, Praat, and Fast Track are now in the viewer. Before expanding this comparison, I would test a globally standardized Bark F1/F2 space. That would answer whether the disagreement reflects genuinely different acoustic structure or mainly the arbitrary relative scaling of F1 and F2.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok test a globally standardized Bark F1/F2 space</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Global Bark standardization does not make the formant result converge with PCA.
+
+Each formant dimension was standardized across all speaker–vowel means:
+
+- Praat: 577 means; F1 SD `0.833`, F2 SD `2.206` Bark
+- Fast Track: 574 means; F1 SD `0.822`, F2 SD `2.213` Bark
+
+### Results
+
+| Method | Space | Reliable speakers | Pearson r | Cluster p | Spearman ρ | Cluster p |
+|---|---|---:|---:|---:|---:|---:|
+| Praat | Raw Bark | 66 | −0.01 | .933 | −0.18 | .226 |
+| Praat | Standardized | 46 | −0.15 | .385 | −0.24 | .177 |
+| Fast Track | Raw Bark | 64 | −0.22 | .121 | −0.29 | .035 |
+| Fast Track | Standardized | 48 | −0.21 | .212 | −0.28 | .079 |
+| PCA | Original | 62 | −0.63 | .0001 | −0.66 | .0001 |
+
+Standardization gives Praat a slightly stronger negative tendency, but it remains weak and non-significant. Fast Track changes little and becomes less conclusive after unreliable, round ellipses are removed.
+
+A notable consequence is that global standardization makes many formant ellipses nearly circular:
+
+- Praat reliable orientations: 66 → 46
+- Fast Track reliable orientations: 64 → 48
+
+This means their major-axis direction becomes unstable after equalizing the global F1 and F2 scales.
+
+My assessment is that the strong PCA orientation gradient is not currently supported by formant-space ellipse orientation. It may reflect spectral information beyond F1/F2, but it could also partly reflect the relative scaling of PC1 and PC2. PCA component variances are unequal, just as raw Bark F1/F2 variances are unequal.
+
+The fairest next diagnostic would therefore standardize PC1 and PC2 globally as well and rerun the PCA angles. If the PCA association remains strong after that, we have better evidence that it reflects genuinely different structure rather than axis scaling.
+
+The standardized maps are now in the viewer. The reusable transformation is in [fit_standardized_formant_ellipses.py](/data/html/dev/swedia-formants-2026/fit_standardized_formant_ellipses.py).</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok standardize PC1
+  and PC2 globally as well</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>After globally standardizing PC1 and PC2, the PCA north–south association remains strong.
+
+| PCA space | Reliable speakers | Pearson r | Cluster p | Spearman ρ | Cluster p |
+|---|---:|---:|---:|---:|---:|
+| Original | 62 | −0.63 | .0001 | −0.66 | .0001 |
+| Globally standardized | 49 | **−0.65** | **.0001** | **−0.53** | **.0008** |
+
+The standard deviations used were:
+
+- PC1: `24.67`
+- PC2: `15.27`
+
+As with standardized formants, fewer ellipses pass the 1.2 axis-ratio threshold because equalizing the axes makes some vowel spaces more circular. Nevertheless, the geographic relationship survives among the reliably oriented ellipses.
+
+This makes it less likely that the PCA result is merely caused by PC1 having greater global variance than PC2. It also sharpens the discrepancy:
+
+- Standardized PCA retains a strong geographic gradient.
+- Standardized Praat and Fast Track show only weak, non-significant tendencies.
+
+The new `pca_standardized_village_angle_map.png` is in the viewer. The standardization utility now supports selecting the PCA midpoint directly via `--time-proportion`.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok lets take a step back. what would be really nice to see is side-by-side plots of pca and praat formant analys. this should take the form of the ones we see in midpoint_vowel-spaces with arrows, midpoints and ellipses
+
+put this in a new script that takes a village as input. for starters just two plots per command: pca to the left, praat to the right</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Added [plot_village_pca_praat_comparison.py](/data/html/dev/swedia-formants-2026/plot_village_pca_praat_comparison.py).
+
+Run it with:
+
+```bash
+swedia-pca/bin/python plot_village_pca_praat_comparison.py bara
+```
+
+It produces:
+
+[bara_pca_praat_vowel_spaces.png](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_24_villages/bara_pca_praat_vowel_spaces.png)
+
+The figure contains:
+
+- PCA vowel space on the left using midpoint `−PC1/−PC2`
+- Praat Burg formants on the right using `−F2/−F1` in Bark
+- Speaker-balanced village vowel means
+- Directed vowel-pair arrows
+- Midpoint crosses
+- Vowel-position and midpoint ellipses
+- Angles and axis ratios
+- Counts of available vowels and speakers
+
+Another analysis directory can be selected with:
+
+```bash
+swedia-pca/bin/python plot_village_pca_praat_comparison.py n_rorum \
+  --analysis-dir Analyses/BarkPCA_24_villages
+```
+
+That directory must contain both `balanced_speaker_vowel_time_pca.csv` and `praat_speaker_vowel_means.csv`. The script compiled and the Bara end-to-end rendering completed successfully.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Ah, yes. I realised pca better use data from many villages to work. Lets do something similar to run_stratified_bark_pca.py (samples a number of villages) but that runs new analyses. plots can then be one village per row, pca in left column. praat in right column. make a new script with number of villages and seed as input.</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Added [run_stratified_pca_praat_comparison.py](/data/html/dev/swedia-formants-2026/run_stratified_pca_praat_comparison.py).
+
+Run it with the number of villages and seed:
+
+```bash
+swedia-pca/bin/python run_stratified_pca_praat_comparison.py 10 12345
+```
+
+This will:
+
+- geographically stratify and sample 10 villages;
+- include all available speakers from each selected village;
+- fit one global Bark-spectrum PCA across the complete sample;
+- run independent fixed-ceiling Praat Burg analysis on the same vowel tokens;
+- create one combined figure with one village per row:
+  - PCA on the left;
+  - Praat Bark F1/F2 on the right;
+- save the sampled villages, recordings, seed, and settings;
+- update the HTML viewer manifest.
+
+Default output:
+
+```text
+Analyses/BarkPCA_Praat_stratified_10_seed12345/
+```
+
+Main figure:
+
+```text
+pca_praat_vowel_spaces.png
+```
+
+The comparison plotter now also accepts multiple villages directly:
+
+```bash
+swedia-pca/bin/python plot_village_pca_praat_comparison.py \
+  bara karsta pitea \
+  --analysis-dir Analyses/BarkPCA_24_villages
+```
+
+Optional controls include:
+
+```bash
+--strata 5
+--praat-ceiling 5500
+--output Analyses/my_comparison
+--dry-run
+```
+
+The end-to-end smoke test used two villages and six speakers: 1,615 PCA measurements, 323 Praat token measurements, and six complete speaker inventories. The resulting two-row comparison rendered successfully.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok, and the next step is to actually plot the angles vs the village coordinates and calc correlations. add this to the new stratified script and now do this only for the vowel targets (not the midpoints) and again put them side-by-side: pca left, praat right
+
+(i cleaned up the Analyses dir since it has gotten difficult to browse)</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Added the angle-map stage to [run_stratified_pca_praat_comparison.py](/data/html/dev/swedia-formants-2026/run_stratified_pca_praat_comparison.py).
+
+A run such as:
+
+```bash
+swedia-pca/bin/python run_stratified_pca_praat_comparison.py 20 12345
+```
+
+now produces:
+
+- `pca_praat_vowel_spaces.png` — village vowel spaces, one village per row
+- `pca_praat_vowel_angle_maps.png` — geographic maps, PCA left and Praat right
+- `pca_praat_village_vowel_ellipses.csv` — village-level ellipse measurements
+- `pca_praat_angle_coordinate_correlations.csv` — Pearson and Spearman correlations against both resource x and y
+
+The map analysis uses only the eight vowel target positions. Midpoints are not calculated or included.
+
+Both panels use:
+
+- the same ±50° color scale;
+- positive angles in blue and negative angles in red;
+- gray crosses for unstable ellipses with axis ratio below 1.2;
+- correlations calculated from reliable village ellipses only.
+
+The new standalone mapping script is [plot_pca_praat_village_angle_maps.py](/data/html/dev/swedia-formants-2026/plot_pca_praat_village_angle_maps.py). It was tested using temporary outputs, leaving the cleaned `Analyses` directory untouched.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok, and now i would like to have this for individual speakers as well. and a change would be that i&#x27;d like to see speaker-individual vowel space plots as well. Now, this will likely be problematic to do in one png (since we might have &gt; 200 speakers if we use all the data) so what do you suggest?</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>I suggest splitting the output by village rather than creating one enormous PNG.
+
+For each sampled run:
+
+- `speaker_spaces/{village}.png`
+  - one speaker per row;
+  - PCA left, Praat right;
+  - vowel means, arrows, midpoints, and ellipses;
+  - usually only 2–3 rows, so each image remains readable;
+  - partial vowel inventories can still be drawn, but angle estimates should only be reported when enough vowels are present.
+
+- `pca_praat_speaker_angle_maps.png`
+  - PCA map left, Praat map right;
+  - one point per speaker, slightly offset around the village coordinate;
+  - identical color scale across methods;
+  - unstable ellipses shown as gray crosses.
+
+- `pca_praat_speaker_vowel_ellipses.csv`
+  - one row per speaker and method;
+  - angles, axis ratios, vowel counts, village, and coordinates.
+
+- `pca_praat_speaker_angle_correlations.csv`
+  - descriptive Pearson and Spearman correlations;
+  - village-clustered permutation p-values, since speakers from the same village share coordinates and are not independent;
+  - number of speakers and villages reported separately.
+
+I would retain the existing village-average plots too. They answer a different question:
+
+- village plots show the geographic pattern after averaging speaker variation;
+- speaker plots show whether that pattern is broadly shared or driven by particular speakers.
+
+One methodological detail: the PCA should still be fitted globally using the entire sampled dataset. We would only separate speakers at the plotting and ellipse-fitting stage. Praat would remain independent of the PCA.
+
+One PNG per village should also work especially well with the HTML viewer and remain manageable even for all ~250 speakers.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>yes, per village is good. maybe we can have the village mean in the first row and then the individual speakers, one per row. this will give us both a village-summary and individual. but in the angle-coordinate maps only use the individual. maybe reuse the same script but set this with an option &#x27;per-speaker&#x27;</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Added `--per-speaker` to [run_stratified_pca_praat_comparison.py](/data/html/dev/swedia-formants-2026/run_stratified_pca_praat_comparison.py).
+
+Example:
+
+```bash
+swedia-pca/bin/python run_stratified_pca_praat_comparison.py \
+  20 12345 \
+  --per-speaker
+```
+
+This produces:
+
+- `speaker_spaces/{village}_pca_praat_speaker_spaces.png`
+  - first row: speaker-balanced village mean;
+  - following rows: individual speakers;
+  - PCA left, Praat right;
+  - arrows, midpoints, vowel ellipses, and midpoint ellipses.
+
+- `pca_praat_speaker_vowel_angle_maps.png`
+  - PCA left, Praat right;
+  - individual speakers only;
+  - speaker points slightly offset around village coordinates;
+  - only complete eight-vowel inventories enter the maps;
+  - midpoint angles are not used.
+
+- `pca_praat_speaker_vowel_ellipses.csv`
+- `pca_praat_speaker_angle_coordinate_correlations.csv`
+
+The speaker correlation table includes:
+
+- Pearson and Spearman correlations against x and y;
+- numbers of speakers and villages;
+- village-clustered permutation p-values.
+
+The full runner was tested successfully with two villages and six speakers. Test outputs were written under `/tmp`, leaving the cleaned `Analyses` directory unchanged.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>i added a files with reference sounds and textgrid in Media and TextGrid, called ref_ym_1. can you first check that these files are in the correct formant for using</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>The reference files are technically valid and work with both analysis pipelines.
+
+Confirmed:
+
+- `Media/ref_ym_1.wav`
+  - 16-bit PCM
+  - mono
+  - 44.1 kHz
+  - exactly 12.5 seconds
+  - automatically resampled to 16 kHz by the PCA analysis
+
+- `TextGrids_all_wos/ref_ym_1.TextGrid`
+  - correct long-text Praat TextGrid format
+  - exactly 12.5 seconds
+  - contains the required `ord` and `seg` interval tiers
+  - all eight base words are present
+  - all eight segment labels match their canonical targets
+  - passes `--strict-seg-label`
+
+A temporary end-to-end test found:
+
+- 8 vowel tokens
+- 40 PCA measurements: 8 vowels × 5 time points
+- no exclusions
+- 8 successful Praat formant measurements
+- one complete eight-vowel speaker space
+
+One caveat: every `seg` interval occupies the entire one-second word interval. This is appropriate if each recording interval is essentially a sustained reference vowel. If the audio contains complete spoken words, the `seg` boundaries should be narrowed to the vowel itself, especially because PCA samples at 10%, 25%, 50%, 75%, and 90% of that interval.
+
+Also, `ref` is not listed in `resource.txt`. Therefore:
+
+- it works when explicitly requested as `ref_ym_1`;
+- it will not be selected as a geographic village;
+- it cannot appear on coordinate maps unless coordinates are added;
+- this is probably desirable for a non-geographic acoustic reference.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>i added it the ref, with a location slighly southwest of kårsta, approximating Stockholm, where we assume these reference values are used.
+
+A more important issue is if the sounds actually have the values we want to use. This is what was used for the synthesis, does the currrent praat analysis give these values. f1 and f2 are most important. Do not adjust the analysis in any way to fit the values, just report deviations.
+
+/u:/
+350
+610
+2100
+4200
+/o:/
+450
+720
+2680
+3400
+/ɑ:/
+645
+940
+2650
+3500
+/ɛ:/
+765
+1630
+2645
+3400
+/e:/
+420
+2360
+2640
+3590
+/y:/
+330
+2040
+2775
+3335
+/ʉ̟:/
+290
+1590
+2500
+3290
+/ø:/
+560
+1280
+2360
+3265</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Using the current Praat analysis unchanged—Burg tracking, 5500 Hz ceiling, median across the central 45–55%—the synthesized targets and measured values compare as follows:
+
+| Vowel | Target F1 | Praat F1 | Deviation | Target F2 | Praat F2 | Deviation |
+|---|---:|---:|---:|---:|---:|---:|
+| /uː/ | 350 | 357 Hz | +7 (+2.1%) | 610 | 620 Hz | +10 (+1.6%) |
+| /oː/ | 450 | 455 Hz | +5 (+1.1%) | 720 | 734 Hz | +14 (+2.0%) |
+| /ɑː/ | 645 | 633 Hz | −12 (−1.9%) | 940 | 947 Hz | +7 (+0.8%) |
+| /ɛː/ | 765 | 754 Hz | −11 (−1.4%) | 1630 | 1606 Hz | −24 (−1.5%) |
+| /eː/ | 420 | 410 Hz | −10 (−2.3%) | 2360 | 1851 Hz | **−509 (−21.6%)** |
+| /yː/ | 330 | 354 Hz | +24 (+7.4%) | 2040 | 1938 Hz | **−102 (−5.0%)** |
+| /ʉ̟ː/ | 290 | 281 Hz | −9 (−3.0%) | 1590 | 1588 Hz | −2 (−0.1%) |
+| /øː/ | 560 | 573 Hz | +13 (+2.3%) | 1280 | 1258 Hz | −22 (−1.7%) |
+
+The result is generally reassuring:
+
+- F1 agrees closely for seven vowels and reasonably for /yː/.
+- F2 agrees closely for six vowels.
+- /yː/ F2 is moderately underestimated by about 102 Hz.
+- /eː/ F2 is the clear failure: Praat reports approximately 1851 Hz instead of the synthesized 2360 Hz.
+
+Across all vowels:
+
+- mean absolute F1 deviation: approximately 11 Hz;
+- median absolute F2 deviation: approximately 18 Hz;
+- mean absolute F2 deviation: approximately 86 Hz, dominated by /eː/.
+
+Thus, the reference recording largely contains and recovers the intended F1/F2 configuration, but the current Praat procedure does not recover the intended /eː/ F2. That discrepancy is much too large to treat as ordinary synthesis or measurement variation. I have not changed any analysis setting to improve the match.
+
+One labeling detail: the reference TextGrid calls the fourth category `ä:` and the analysis identifies it as `/æː/`, while the supplied synthesis specification calls it `/ɛː/`. The numerical comparison above treats these as the corresponding same fourth reference vowel.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Since we want to use this for reference it quite important that the analysis produces a close value. However, i would prefer to keep the analysis constant at this stage, but maybe we can manipulate the sound so that the analysis gives a value that is closer to the target. or maybe we can synthesise a sweep with changing input f2 and then check where it fits. this will probably require afew tries. /e:/ and /y:/ are obviously most important. see if you can make that work. praat is in the environment and can be used, maybe there are other methods.</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>The calibrated reference is now active at [Media/ref_ym_1.wav](/data/html/dev/swedia-formants-2026/Media/ref_ym_1.wav).
+
+The Praat analysis was not changed. The final WAV was tested using exactly the existing Burg settings.
+
+| Vowel | Formant | Target | Before | After | Final deviation |
+|---|---|---:|---:|---:|---:|
+| /eː/ | F1 | 420 | 410 | 426 | +6 Hz |
+| /eː/ | F2 | 2360 | 1851 | 2347 | −13 Hz |
+| /yː/ | F1 | 330 | 354 | 323 | −7 Hz |
+| /yː/ | F2 | 2040 | 1938 | 2041 | +1 Hz |
+
+The higher measured formants are:
+
+| Vowel | Measured F3 | Target F3 | Measured F4 | Target F4 |
+|---|---:|---:|---:|---:|
+| /eː/ | 2619 | 2640 | 3531 | 3590 |
+| /yː/ | 2807 | 2775 | 3270 | 3335 |
+
+Thus all four important F1/F2 values are now within 13 Hz of their targets. The other six vowel intervals were retained unchanged.
+
+I added [calibrate_reference_vowels.py](/data/html/dev/swedia-formants-2026/calibrate_reference_vowels.py) so the calibration is reproducible. It uses controlled source–filter synthesis with an additional high-frequency resonance that prevents the unchanged 5.5-formant Burg model from inserting a spurious resonance below the intended F2.
+
+Files retained for provenance:
+
+- [original WAV](&lt;/data/html/dev/swedia-formants-2026/reference_calibration/ref_ym_1_original.wav&gt;)
+- [calibrated WAV](&lt;/data/html/dev/swedia-formants-2026/reference_calibration/ref_ym_1_calibrated.wav&gt;)
+
+The active file and retained calibrated file have matching checksums.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Great work! ok my thinking here is that this should always be included in run_stratified_pca_praat_comparison.py and then we&#x27;ll see where it fits. the interesting part is how the pca handles this. adjust the script and we&#x27;ll see</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Updated [run_stratified_pca_praat_comparison.py](/data/html/dev/swedia-formants-2026/run_stratified_pca_praat_comparison.py) so `ref_ym_1` is always included.
+
+Behavior now:
+
+- The requested count still means dialect villages.
+- `ref` is excluded from random sampling.
+- `ref_ym_1` is added as one extra recording.
+- The reference participates in the global PCA fit.
+- It appears in village and individual-speaker vowel-space plots.
+- It appears as a star on the coordinate maps.
+- It is excluded from geographic correlations because it is constructed rather than observed dialect data.
+- Run metadata records dialect-speaker and total-speaker counts separately.
+
+I also added the necessary mapping between recording stem `ref` and resource stem `reference`.
+
+For example:
+
+```bash
+swedia-pca/bin/python run_stratified_pca_praat_comparison.py \
+  20 12345 \
+  --per-speaker
+```
+
+will analyze 20 dialect villages plus the reference.
+
+The end-to-end test used two dialect villages:
+
+- 2 sampled dialect villages
+- 6 dialect speakers
+- 1 reference speaker
+- 7 total analyzed speakers
+- reference included in PCA and Praat plots
+- correlations correctly retained only 6 speakers from 2 observed villages
+
+As an initial smoke-test observation—not a substantive result because that PCA used only two dialect villages—the reference ellipse angle was:
+
+- PCA: −25.1°
+- Praat: −3.5°
+
+That discrepancy is exactly the kind of behavior the larger runs should help us understand.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>unfortunately this does not work the way i wanted. i basically wanted the ref to be &#x27;embedded&#x27; in the pca space but if you look at the values you&#x27;ll see that they are scaled up and mostly appear outside the vowel space for the real values. i see this easily in the plots but maybe its easier to see this whereever you can look for the actual values. so maybe the synthesized nature of it adds to much of whatever else to be useful</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Yes—the synthesized nature is affecting the PCA substantially. It is not merely a plotting-scale problem.
+
+In the test run where the reference participated in fitting the PCA, its midpoint scores were extreme:
+
+- /uː/: about 6.5 within-vowel SD from real speech on PC1
+- /æː/: about 5.9 SD on PC2
+- /øː/: about 5.5 SD on PC2
+- several other vowels: roughly 3–4 SD away
+
+I also tested the methodologically correct alternative: fit PCA only on real speech and project the reference afterward. That reduced the distortion but did not eliminate it:
+
+- /eː/ and /yː/ fell reasonably inside the real distributions
+- /uː/ remained about 4 SD outside
+- /oː/, /ʉ̟ː/, and /øː/ remained roughly 2–3 SD outside
+
+The likely explanation is that Bark-spectrum PCA measures much more than F1 and F2:
+
+- spectral tilt and source characteristics;
+- F0 and harmonic spacing;
+- formant bandwidths;
+- relative formant amplitudes;
+- high-frequency energy;
+- synthesis-filter characteristics.
+
+The reference sounds have accurate Praat F1/F2 values, but that does not make their complete spectra equivalent to human speech. Including them in the PCA fit is particularly undesirable because the PCA then partly rotates and scales itself to accommodate an artificial spectral source.
+
+My recommendation is:
+
+- retain `ref_ym_1` as a useful Praat/formant reference;
+- do not include it when fitting the PCA;
+- optionally project it into a PCA trained exclusively on real speech as an explicitly marked out-of-distribution diagnostic;
+- do not interpret its PCA position as a canonical vowel target.
+
+We could attempt to synthesize more speech-like source spectra, but that would require calibrating F0, spectral tilt, bandwidths, amplitude relationships, and probably aspiration—not just the formants. It would turn the reference into a model of a particular synthetic speaker, and there would still be no guarantee that its PCA position represents central Swedish speech.
+
+So the result is informative: the reference works very well for validating the fixed Praat analysis, but it is not a reliable anchor for the spectral PCA. I have not changed the runner again yet.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>well the idea was exactly to obtain PCA positions that could correspond to canonical vowel target. but this is probably the wrong approach</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>I agree. A formant-matched synthetic vowel is probably the wrong way to define canonical targets in spectral PCA space.
+
+PCA has no intrinsic notion of a canonical vowel. Its coordinates depend on the spectra used to fit it, including speaker source characteristics, recording conditions, spectral tilt, bandwidths, and F0. Matching synthetic F1/F2 therefore does not guarantee an appropriate PCA position.
+
+A better reference would be empirical:
+
+- Fit PCA using real speech only.
+- Choose real central-Swedish speakers, ideally Kårsta plus nearby locations.
+- Calculate speaker-balanced means for each vowel.
+- Define the canonical PCA targets as the centroids—or robust medians—of those real observations.
+- Quantify their uncertainty with covariance ellipses or bootstrap intervals.
+- Project other speakers into that fixed PCA model and measure displacement from those empirical reference distributions.
+
+That would produce canonical targets which are:
+
+- genuinely located within the real-speech PCA space;
+- matched to the recording and speaker characteristics of SweDia;
+- reproducible once the reference speakers and PCA model are frozen;
+- suitable for distance-based comparisons.
+
+The synthetic recording remains valuable as a Praat calibration check. It demonstrates that the fixed formant analysis recovers known F1/F2 values, but it should not influence the PCA fit or serve as its spatial reference.
+
+I would therefore remove `ref_ym_1` from the PCA/Praat comparison runner’s automatic sample and instead develop a separate empirical-reference option based on Kårsta and selected neighboring central-Swedish speakers.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>yes remove it</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Removed the synthetic reference from automatic sampled analyses.
+
+`run_stratified_pca_praat_comparison.py` now:
+
+- excludes `ref` from eligible sampling;
+- does not include it in the PCA fit;
+- does not analyze or plot it;
+- reports only sampled dialect villages and speakers;
+- no longer gives the reference special map treatment.
+
+A dry run confirmed 5 requested villages produce exactly 5 dialect villages and 15 speakers.
+
+The calibrated reference audio and its resource alias remain available for explicit Praat calibration tests, but they will not influence PCA analyses.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Write a very brief summary; how we compare pca and praat formant calculation; how we fit ellipses to represent the &#x27;vowel space&#x27;; and how we try to correlate this with geographical space
+
+And that we can&#x27;t really project synthetic reference vowels with correct formant values into the pca space
+
+Centre this around the plots in 
+
+Analyses/BarkPCA_Praat_stratified_83_seed50/pca_praat_vowel_spaces.png (where we see the ellipsed)
+Analyses/BarkPCA_Praat_stratified_83_seed50/pca_praat_vowel_angle_maps.png (villages)
+Analyses/BarkPCA_Praat_stratified_83_seed51/pca_praat_speaker_vowel_angle_maps.png (speakers)</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>## Brief summary
+
+We compare two independent representations of the same eight vowel targets. The PCA analysis reduces 20 Bark-filtered spectral-energy bands to PC1 and PC2, while Praat estimates F1 and F2 with a fixed 5500-Hz Burg analysis and converts them to Bark. In [the vowel-space comparison](&lt;/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_Praat_stratified_83_seed50/pca_praat_vowel_spaces.png&gt;), PCA is shown on the left and Praat on the right.
+
+For each village, the eight speaker-balanced vowel means define a vowel space. A covariance ellipse is fitted to these positions, and its major-axis angle represents the general orientation of the vowel system. The angles are then plotted at the villages’ geographical coordinates in [the village maps](&lt;/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_Praat_stratified_83_seed50/pca_praat_vowel_angle_maps.png&gt;). PCA orientation has a substantial north–south association (Pearson \(r=-.54\), Spearman \(\rho=-.62\)), whereas Praat orientation does not (\(r=.05\), \(\rho=.03\)).
+
+The analysis is repeated for complete individual-speaker vowel spaces in [the speaker maps](&lt;/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_Praat_stratified_83_seed51/pca_praat_speaker_vowel_angle_maps.png&gt;). The PCA association remains (\(r=-.36\), clustered \(p=.0002\); \(\rho=-.46\), clustered \(p&lt;.0001\)), but the Praat association remains absent. Thus, the geographical PCA pattern is not currently reproduced by conventional F1/F2 orientation.
+
+Finally, synthetic vowels with accurately recoverable formant values cannot straightforwardly serve as canonical PCA targets. Their source spectrum, harmonic structure, spectral tilt, and bandwidths differ from natural speech, placing them outside the real-speech PCA space even when F1 and F2 are correct.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>actually rather make it as a web page instead; this will make it easier to view and ref to the images</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Created the web summary:
+
+[pca-praat-comparison-summary.html](/data/html/dev/swedia-formants-2026/Analyses/pca-praat-comparison-summary.html)
+
+It includes:
+
+- a concise methodology summary;
+- the village vowel-space comparison;
+- village-level angle maps and correlations;
+- individual-speaker angle maps and clustered correlations;
+- the conclusion about synthetic reference vowels;
+- section anchors and full-resolution image links;
+- scrolling and zoom controls for the extremely tall 83-village figure.
+
+All referenced files and links were validated.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>also make a script that aggregates the data as a file with a very simple table with
+
+village,speaker,vowel,n_tokens,f1,f2,pc1,pc2
+
+then run the script and include the file on the web page</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Created [aggregate_pca_praat_table.py](/data/html/dev/swedia-formants-2026/aggregate_pca_praat_table.py) and ran it on the seed-51 analysis.
+
+Generated:
+
+[pca_praat_speaker_vowels.csv](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_Praat_stratified_83_seed51/pca_praat_speaker_vowels.csv)
+
+The file contains:
+
+- 1,955 speaker-vowel rows
+- 83 villages
+- 250 speakers
+- all eight vowel categories
+- no missing or non-finite acoustic values
+
+Columns are exactly:
+
+```text
+village,speaker,vowel,n_tokens,f1,f2,pc1,pc2
+```
+
+F1/F2 are in Hz; PC1/PC2 are measured at the vowel midpoint. The [web summary](/data/html/dev/swedia-formants-2026/Analyses/pca-praat-comparison-summary.html) now includes a direct download link and a brief field description.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ah forgot! we need to include the x,y village coordinates in the data file as well</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Updated and regenerated the [aggregated CSV](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_Praat_stratified_83_seed51/pca_praat_speaker_vowels.csv).
+
+The columns are now:
+
+```text
+village,speaker,vowel,n_tokens,f1,f2,pc1,pc2,x,y
+```
+
+All 1,955 rows have valid coordinates, consistently matched across all 83 villages. The web-page description was updated accordingly.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>so the million dollar question: why does pca work better than formants? and is there anything we can do to improve? be very brief</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>PCA may work better because it captures the entire spectral shape—not only F1/F2—including formant transitions, spectral tilt, bandwidths, higher resonances, and effects of diphthongization. It may therefore preserve dialect information that a midpoint F1/F2 analysis discards. Conversely, the PCA pattern could partly reflect recording or source differences correlated with geography.
+
+To improve confidence:
+
+- Analyse F1/F2 trajectories instead of midpoint values.
+- Improve formant tracking and reject implausible tracks.
+- Test normalized F1/F2 spaces and additional formants.
+- Control for speaker, recording quality, and regional recording batches.
+- Validate the PCA gradient using held-out villages and alternative spectral preprocessing.
+
+Most importantly, determine which Bark bands drive the geographical PCA effect. That will show whether PCA captures vowel structure or a geographic recording artefact.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Ok lets revisit the pca informed formant analysis. If i recall correctly you made a script
+
+analyze_pca_informed_formants.py
+
+that
+
+- Learns a PC1/PC2-plus-vowel calibration to Bark F1/F2 from the 24-village combined data.
+- Runs Praat Burg at nine ceilings from 4500–6500 Hz.
+- Measures five points through every vowel.
+- Scores candidates using PCA agreement, trajectory smoothness, and bandwidth.
+- Preserves every candidate and its score.
+- Flags edge-ceiling selections and large PCA residuals.
+- 
+We could do something similar again, but maybe with more villages. The important thing is to keep the original Praat results, so we can compare.
+
+The angle/north-south correlation could perhaps be used as a sort of external validation.
+
+The current existing pca-formant report and workflows should be preserved for now, so dont update or change any of that.</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Yes. The clean next experiment is a new, separate v2 workflow:
+
+- Fit the PC1/PC2-plus-vowel calibration using the retained 24-village FastTrack measurements, but use those speakers’ scores from the new 83-village PCA. PCA coordinates from different fitted runs are not directly interchangeable.
+- Apply the nine-ceiling selection to all 83 villages.
+- Preserve the existing fixed-5500-Hz Praat results unchanged.
+- Write every candidate, cost component, selected ceiling, and quality flag to a new analysis directory.
+- Compare three independent vowel-space results:
+  - spectral PCA;
+  - original fixed-ceiling Praat;
+  - PCA-informed Praat.
+- Calculate village- and speaker-level ellipse angles and their geographical correlations.
+
+The north–south relationship should only be evaluated afterward as external validation. It must not influence candidate selection; otherwise we would be optimizing the formants to reproduce the hypothesis.
+
+I have not modified any existing script, report, workflow, or output.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>i actually think dont use fasttrack at all in this experiment. this is an extra variable that we dont really have access to in this environment. so only use spectral pca and fixed ceiling praat to do pca informed praat</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Agreed—FastTrack should be excluded entirely.
+
+The new experiment should use only:
+
+1. Spectral PCA.
+2. Unmodified fixed-5500-Hz Praat as the calibration target.
+3. Multi-ceiling Praat candidates for PCA-informed selection.
+
+To reduce circularity, the PCA-to-formant mapping should be cross-fitted by village: predict each village’s expected F1/F2 using a calibration learned from all other villages. Candidate selection can then combine:
+
+- distance from the cross-fitted PCA prediction;
+- trajectory smoothness;
+- bandwidth penalties.
+
+The original fixed-ceiling measurements remain unchanged for direct comparison.
+
+One caveat: the north–south correlation is not fully independent validation because PCA contributes directly to candidate selection. A closer PCA-like geographical pattern is therefore expected. We should also evaluate tracking failures, edge-ceiling selections, trajectory smoothness, and differences from fixed Praat.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>yes the north-south is the last thing, i agree. otherwise go ahead</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Implemented and ran the separate PCA-informed Praat v2 experiment across all 83 villages.
+
+New workflow: [analyze_pca_informed_formants_v2.py](/data/html/dev/swedia-formants-2026/analyze_pca_informed_formants_v2.py)
+
+Results: [PCAInformedPraat_v2_83_seed51](/data/html/dev/swedia-formants-2026/Analyses/PCAInformedPraat_v2_83_seed51)
+
+Key results:
+
+- 11,835 tokens from 250 speakers
+- Calibration uses only fixed-5500-Hz Praat
+- Cross-fitted by held-out village
+- Median absolute change:
+  - F1: 7.1 Hz
+  - F2: 14.6 Hz
+- Fixed versus informed ellipse angles: Pearson \(r=.84\)
+- Agreement with PCA angles increased:
+  - Fixed Praat: \(r=.26\)
+  - Informed Praat: \(r=.37\)
+
+Final north–south validation:
+
+- Fixed Praat: \(r=-.03\), no relationship
+- PCA-informed Praat: \(r=-.18\), clustered \(p=.030\)
+- Spectral PCA: \(r=-.36\), clustered \(p=.0002\)
+
+The informed analysis therefore moves partially toward the PCA pattern, but remains much weaker.
+
+Important warning: 3,456 tokens were flagged, primarily because 2,949 selected an edge ceiling. A few F2 changes were extremely large and require inspection.
+
+Outputs include:
+
+- [summary report](/data/html/dev/swedia-formants-2026/Analyses/PCAInformedPraat_v2_83_seed51/REPORT.md)
+- [selection diagnostics](/data/html/dev/swedia-formants-2026/Analyses/PCAInformedPraat_v2_83_seed51/selection_diagnostics.png)
+- [speaker angle map](/data/html/dev/swedia-formants-2026/Analyses/PCAInformedPraat_v2_83_seed51/informed_speaker_vowel_angle_map.png)
+- `candidate_formant_tracks.csv` — every candidate and score
+- `selected_formant_tracks.csv`
+- `fixed_vs_informed.csv`
+- `informed_speaker_vowel_means.csv`
+- `informed_speaker_ellipses.csv`
+
+All earlier workflows and fixed-Praat outputs remain unchanged.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Ok, at least somewhat promising. The large number of edge hitting is a little concerning though.
+
+Is the PCA info fixed somewhere? So we an we have a script to run
+a) fixed-ceiling
+b) PCA informed
+formant analysis for a speaker?
+
+and get f1/F2 plots with arrows and angles for both, side-by-side. 
+
+Or do we need to redo PCA every time for this?</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>The PCA information is fixed for speakers already included in the 83-village run:
+
+- filter-band means and loadings: `pca_loadings.csv`
+- projected token scores: `token_spectral_pca.csv`
+- fixed-Praat calibration: cross-fitted from the stored 83-village results
+
+PCA does not need to be recomputed for these 250 speakers.
+
+Run one speaker with:
+
+```bash
+swedia-pca/bin/python run_speaker_fixed_vs_pca_informed.py bara_ym_1
+```
+
+This:
+
+1. Reads the preserved fixed-5500-Hz results.
+2. Reruns the nine-ceiling PCA-informed selection for that speaker.
+3. Preserves all candidates, scores, flags, and selected tracks.
+4. Produces a side-by-side vowel-space plot:
+   - fixed Praat left;
+   - PCA-informed Praat right;
+   - arrows, midpoints, vowel ellipses, midpoint ellipses, and angles.
+
+Example:
+
+[bara_ym_1 comparison](/data/html/dev/swedia-formants-2026/Analyses/PCAInformedPraat_v2_83_seed51/speaker_comparisons/bara_ym_1.png)
+
+Scripts added:
+
+- [run_speaker_fixed_vs_pca_informed.py](/data/html/dev/swedia-formants-2026/run_speaker_fixed_vs_pca_informed.py)
+- [plot_speaker_fixed_vs_pca_informed.py](/data/html/dev/swedia-formants-2026/plot_speaker_fixed_vs_pca_informed.py)
+
+For a completely new speaker outside the 83-village run, we would need an additional extraction-and-projection step using the saved PCA loadings—but still would not need to refit PCA.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>yes it should be possible to run on other speakers. and the extraction-and-projection step should be possible even for known speakers so the script would not need to know if its a known or new speaker. actually we should maybe allow for choice of pca loadings so we can run it even if trained on some other data. is that possible?</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Yes. The saved PCA model contains enough information to project any speaker without refitting:
+
+- Bark-filter definitions
+- band means
+- PC loadings
+- analysis settings
+
+The generic workflow can therefore:
+
+1. Extract Bark spectra from the speaker’s WAV/TextGrid.
+2. Project them through a selected saved PCA model.
+3. Apply the corresponding PCA-to-fixed-Praat calibration.
+4. Run fixed and PCA-informed Praat.
+5. Produce the side-by-side plot.
+
+The important constraint is that loadings cannot be selected alone. Each PCA basis has different coordinates, so it must travel with a calibration learned in that same PCA space. I suggest a `--pca-model` option pointing to an analysis directory containing:
+
+```text
+pca_loadings.csv
+run_settings.json
+balanced_speaker_vowel_time_pca.csv
+praat_speaker_vowel_means.csv
+```
+
+Usage could then be:
+
+```bash
+swedia-pca/bin/python run_speaker_fixed_vs_pca_informed.py \
+  newplace_ym_1 \
+  --pca-model Analyses/BarkPCA_Praat_stratified_83_seed51
+```
+
+The script can always re-extract and project the requested recording, whether it is known or new. For a genuinely new village, the formant calibration would use coefficients trained on the complete model dataset; for a village represented in the training set, it can automatically use the existing leave-that-village-out calibration to avoid leakage. No PCA refitting is necessary.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>yes i like that idea, --pca-model option is good</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Implemented `--pca-model` support.
+
+Run any speaker with:
+
+```bash
+swedia-pca/bin/python run_speaker_fixed_vs_pca_informed.py \
+  RECORDING_ID \
+  --pca-model Analyses/BarkPCA_Praat_stratified_83_seed51
+```
+
+The runner now always:
+
+1. Extracts the speaker’s Bark spectra from WAV/TextGrid.
+2. Projects them through the selected saved PCA loadings.
+3. Runs fixed-5500-Hz Praat.
+4. Runs PCA-informed multi-ceiling Praat.
+5. Creates the side-by-side vowel-space plot.
+
+It works identically for known and new speakers:
+
+- Known village: automatically uses leave-village-out calibration.
+- New village: automatically uses the global calibration from the model.
+- PCA is never refitted.
+
+The PCA model directory must contain its complete compatible bundle:
+
+```text
+pca_loadings.csv
+run_settings.json
+balanced_speaker_vowel_time_pca.csv
+praat_speaker_vowel_means.csv
+```
+
+Added [project_speaker_to_pca_model.py](/data/html/dev/swedia-formants-2026/project_speaker_to_pca_model.py) for the extraction/projection stage.
+
+Validation:
+
+- Reprojecting `bara_ym_1` reproduced all stored PC1–PC3 scores exactly.
+- The unseen `ref_ym_1` successfully used the global-model fallback and completed both analyses and plotting. This was only a pipeline test; the synthetic reference is still unsuitable as a PCA target.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>The analysis viewer could use more functions
+
+-collapse a dir with images (+ and - signs to expand/collaps) - this saves some scrolling, persist in local storage or indexeddb
+-rescan Analyses dir for images</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Updated [Analyses/index.html](/data/html/dev/swedia-formants-2026/Analyses/index.html) with:
+
+- `+`/`−` controls for each image directory
+- collapsed-directory state persisted in `localStorage`
+- directory image counts
+- search temporarily expanding matching directories
+- visible/total image counts
+- a server-side **Rescan** button
+
+Added [rescan_pngs.php](/data/html/dev/swedia-formants-2026/Analyses/rescan_pngs.php), which:
+
+- recursively scans `Analyses` for PNGs
+- respects `png_manifest_exclude.txt`
+- rewrites `png_manifest.json`
+- immediately returns the updated list to the viewer
+
+The scan found and indexed 107 PNGs. PHP and JavaScript syntax checks passed. If the web server does not execute PHP, the viewer displays the existing command-line fallback.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>hm, php def works on this server but rescan button fails and displays the command line. can it write to the manifest?</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Yes—the failure was a filesystem permission problem.
+
+PHP likely runs as `www-data`, while `png_manifest.json` was writable only by `ubuntu:ubuntu`. I changed the manifest to mode `666`, allowing the PHP endpoint to update that specific file.
+
+I also improved the viewer so future failures display the actual PHP error, including whether the manifest is writable.
+
+The rescan endpoint now successfully returns 107 PNG paths when tested. Reload the viewer and try **Rescan** again.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok, designed an ran an experiment in formant-review-400 where we compared praat-fixed and pca-informed. results are somewhat promising for pca-informed. See here
+
+---
+
+The 400-token run is **much more mixed than the pilot**: PCA-informed has a small lead in pooled preferences, but the representative portion shows no overall advantage.
+
+All **400 main trials and 20 hidden repeats** were completed. Using the latest saved judgment for each trial:
+
+| Judgment | Broad sample (240) | Diagnostic sample (160) | Total |
+|---|---:|---:|---:|
+| PCA-informed better | 19 | 43 | **62** |
+| Praat-fixed better | 21 | 33 | **54** |
+| Both good | 185 | 66 | **251** |
+| Both bad | 13 | 15 | **28** |
+| Uncertain | 2 | 3 | **5** |
+
+The diagnostic sample deliberately emphasizes disagreement and boundary cases, so the pooled totals aren’t estimates of corpus-wide performance. Applying the sampling weights to the broad sample gives **78.5% both good**, **8.9% fixed preferred**, **6.9% informed preferred**, **5.0% both bad**, and **0.6% uncertain**. That is a small descriptive advantage for fixed tracking; statistical uncertainty hasn’t been assessed.
+
+The interesting signal is **where the methods disagree**:
+
+- **High disagreement, 93 tokens:** informed preferred **46**, fixed **25**, both good only **5**. Informed has a substantial advantage here.
+- **Low disagreement, 307 tokens:** informed preferred **16**, fixed **29**, both good **246**. Most changes make little perceptual difference, with some favoring fixed.
+- Within high-disagreement cases, informed’s advantage was strongest with an **interior ceiling: 24 versus 8** preferences. At a ceiling boundary, it was smaller: **22 versus 17**.
+
+Repeat consistency looks encouraging: **17/20 judgments matched exactly (85%)**, with **no direct fixed-to-informed preference reversals**. Two changed from fixed preferred to both good; one changed from informed preferred to both bad.
+
+The comments also clarify what “better” means: sometimes **both were acceptable**, but one tracked F2 more centrally. Other comments identify weak F2, jumps near the evaluation window, or both methods missing the relevant band. Preference therefore shouldn’t be treated as an absolute acceptability score.
+
+All judgments were made on mobile, over about **47 minutes elapsed**, with a median recorded trial time of **2.9 seconds**.
+
+This supports investigating **PCA-informed tracking as a selective correction for large-disagreement cases**. Evidence for replacing fixed tracking throughout the material is weak in this reviewer’s results.
+
+---
+
+what we still dont have is an outright comparison of praat-fixed with fasttrackpy. i created a new venv in fastrackpy and tried to install it there, but this fails since we&#x27;re on python 3.14. can you check?</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ah, please continue now. fasttrackpy venv is now directly in this dir, not under swedia-pca</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Confirmed: the failure is specifically Python compatibility.
+
+- Current `fasttrackpy` venv: Python 3.14.4
+- Latest FastTrackPy: 0.6.1
+- Supported Python range: `&gt;=3.10,&lt;3.14`
+- Python 3.12.13 is already available at `/home/ubuntu/.local/bin/python3.12`
+- A complete dependency resolution under Python 3.12 succeeded.
+- The `CandidateTracks` interface used by [compare_formant_trackers.py](/data/html/dev/swedia-formants-2026/compare_formant_trackers.py:734) remains compatible with FastTrackPy 0.6.1.
+
+The solution is to recreate the environment with Python 3.12:
+
+```bash
+mv fasttrackpy fasttrackpy-py314
+/home/ubuntu/.local/bin/python3.12 -m venv fasttrackpy
+fasttrackpy/bin/python -m pip install fasttrackpy
+```
+
+No repository files or environments were changed during this check. Once installed, we can test the existing comparison script on a small sample before designing the 400-token fixed-versus-FastTrack experiment.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ah, yes, works! yes. go ahead with the fixed-vs-fasttrack experiement in the same style as formant-review-400</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>i ran those sudo commands. it should work now</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>The fixed-Praat versus FastTrackPy experiment is built and live:
+
+https://scriptlogram.net/dev/swedia-formants-2026/formant-review-fasttrack-400/
+
+It uses the same 400 tokens as the PCA-informed experiment, enabling direct token-level comparison:
+
+- Praat: fixed 5,500 Hz ceiling
+- FastTrackPy 0.6.1: 20 candidates from 4,000–7,000 Hz
+- Same audio, spectrograms and 45–55% judgment window
+- 400 main trials plus 20 hidden repeats
+- Independent blinded panel ordering and reviewer storage
+- Part A retains its population weights
+- Part B remains PCA-disagreement-enriched—not FastTrack-diagnostic
+
+FastTrack selected an endpoint for only 23/400 tokens: 19 at 4,000 Hz and 4 at 7,000 Hz.
+
+Validation passed:
+
+- Exact match to the original 400 stimuli
+- 83 villages and 241 speakers
+- Track and asset integrity checks
+- 1,269 storage, randomization, repeat and concurrency checks
+- Live page, JS, audio and images return HTTP 200
+- Private manifest returns HTTP 403
+- API reports `Ready`
+
+The builder is [build_fasttrack_review_400.py](/data/html/dev/swedia-formants-2026/build_fasttrack_review_400.py), with study documentation in [README.md](/data/html/dev/swedia-formants-2026/formant-review-fasttrack-400/README.md).</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok, summarize bd0a...</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok, summarize bd0a... its copied to the present dir with owner ubuntu and readable</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>The fixed-versus-FastTrack result is substantially clearer than the PCA-informed experiment: FastTrack has a strong advantage, including in the representative sample.
+
+| Judgment | Broad sample (240) | Diagnostic sample (160) | Total |
+|---|---:|---:|---:|
+| FastTrack better | 28 | 53 | **81** |
+| Praat-fixed better | 7 | 2 | **9** |
+| Both good | 199 | 97 | **296** |
+| Both bad | 5 | 6 | **11** |
+| Uncertain | 1 | 2 | **3** |
+
+Applying the sampling weights to the broad sample gives:
+
+- **83.5% both good**
+- **11.4% FastTrack preferred**
+- **2.8% fixed preferred**
+- **2.1% both bad**
+- **0.3% uncertain**
+
+Thus, among directional preferences in the weighted representative portion, FastTrack leads roughly four to one. This is much stronger than the small and mixed PCA-informed advantage.
+
+The old diagnostic categories still show something interesting, although they were defined from fixed-versus-PCA disagreement:
+
+- Low-disagreement cases: FastTrack **32**, fixed **5**, both good **265**
+- High-disagreement cases: FastTrack **49**, fixed **4**, both good **31**
+
+FastTrack endpoint selections were uncommon—23 tokens—but more contentious:
+
+- Interior candidates: FastTrack **68**, fixed **5**, both good **291**
+- Endpoint candidates: FastTrack **13**, fixed **4**, both good **5**
+
+Repeat consistency was excellent: **18/20 exact matches (90%)**. The other two changed from FastTrack preferred to both good; there were no preference reversals.
+
+All 420 trials were completed, with four revisions. Median recorded active time was 1.9 seconds per judgment, totalling about 31.5 active minutes.
+
+Overall, this reviewer provides fairly strong evidence that FastTrack improves upon fixed-ceiling Praat selectively while leaving most already-good tracks acceptable. Unlike PCA-informed tracking, the benefit is also clearly visible in the weighted representative sample. Statistical uncertainty and reviewer generalizability still need assessment.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok, this is good. i think we need one more test, that will be fasttrack vs pca-informed fasttrack (so not the same as pca-informed-praat). it might be that fasttrack alone improves too much, but since pca-informed showd a marginal improvement it might be worth testing</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>The plain FastTrack versus PCA-informed FastTrack experiment is built and live:
+
+https://scriptlogram.net/dev/swedia-formants-2026/formant-review-pca-fasttrack-400/
+
+Both methods use the identical 20 FastTrack candidates and smoothing. Only candidate selection differs:
+
+- Plain: FastTrack’s native loss
+- PCA-informed: PCA residual + trajectory roughness + bandwidth penalty
+
+PCA changes 368/400 selections, with a median ceiling change of 632 Hz. Endpoint selections increase from 23 to 40, so the experiment should reveal whether PCA improves FastTrack or intervenes too aggressively.
+
+It uses the same 400 tokens, 20 repeats, blinding, weights and interface as the previous studies. Validation and all /le 1,269 storage/randomization checks passed; the live API reports `Ready`.
+
+Builder: [build_pca_fasttrack_review_400.py](/data/html/dev/swedia-formants-2026/build_pca_fasttrack_review_400.py)</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok, summarize a9e2... its copied to the present dir with owner ubuntu and readable</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>The result favors plain FastTrack over PCA-informed FastTrack, although most PCA changes make no perceptible difference.
+
+| Judgment | Broad sample (240) | Diagnostic sample (160) | Total |
+|---|---:|---:|---:|
+| PCA-FastTrack better | 11 | 10 | **21** |
+| Plain FastTrack better | 18 | 27 | **45** |
+| Both good | 207 | 117 | **324** |
+| Both bad | 0 | 5 | **5** |
+| Uncertain | 4 | 1 | **5** |
+
+Weighted broad-sample estimates are:
+
+- **86.6% both good**
+- **7.8% plain FastTrack preferred**
+- **4.6% PCA-FastTrack preferred**
+- **1.1% uncertain**
+- **0% both bad**
+
+Thus plain FastTrack has a modest descriptive advantage: roughly 1.7-to-1 in the weighted representative sample and 2.1-to-1 in pooled directional preferences. Statistical uncertainty has not been assessed.
+
+PCA changed the candidate for 368 tokens:
+
+- Plain FastTrack preferred: **45**
+- PCA-FastTrack preferred: **21**
+- Both good: **292**
+- Both bad or uncertain: **10**
+
+All 32 unchanged selections were judged both good, as expected. Larger ceiling changes produced more preferences in both directions, but plain FastTrack remained ahead. PCA-selected endpoint cases also favored plain FastTrack, 9 versus 4.
+
+There is no obvious vowel-specific PCA benefit. `/u:/` was tied 8–8, while plain FastTrack led for most other vowels.
+
+Repeat agreement was **16/20 (80%)**, with no direct plain-to-PCA preference reversal. Three comments concerned raspy material; other comments emphasized that differences outside the gold window did not necessarily matter.
+
+Overall, this does not support adding PCA selection on top of FastTrack in its current form. FastTrack already appears to solve much of the tracking problem, and the PCA rule changes candidates very frequently while producing somewhat more losses than gains. Plain FastTrack is presently the stronger default.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok can we run fasttrack on all, make vowel plots with arrows and ellipses then test the north-south vs angle and finally make a second report that compares fixed-praat with fasttrack. include a downloadable fasttrack-speaker-vowels.csv in the same format as the fastrack formant levels</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Completed the full FastTrack analysis and comparison report:
+
+https://scriptlogram.net/dev/swedia-formants-2026/Analyses/FastTrack_all_83/
+
+Results include:
+
+- 11,835 tokens
+- 250 speakers
+- 83 villages
+- 1,955 speaker-vowel aggregates
+- 83 village vowel-space plots with arrows, midpoints and ellipses
+- Village and individual-speaker angle maps
+- Fixed-Praat versus FastTrack agreement plots
+- Downloadable [fasttrack-speaker-vowels.csv](https://scriptlogram.net/dev/swedia-formants-2026/Analyses/FastTrack_all_83/fasttrack-speaker-vowels.csv)
+
+The CSV columns are:
+
+```text
+village,speaker,vowel,n_tokens,f1,f2,x,y
+```
+
+Main geographical result:
+
+- Village FastTrack angle versus y: `r=-0.158, p=.155`; `ρ=-0.173, p=.117`
+- Speaker FastTrack angle versus y: `r=-0.159`, clustered `p=.053`; `ρ=-0.166`, clustered `p=.043`
+- Fixed Praat shows essentially no north–south relationship.
+- The x coordinate has a stronger association for both methods.
+
+Fixed and FastTrack generally remain close: median absolute differences are approximately 10 Hz for F1 and 21 Hz for F2, although the upper tail is larger for F2.
+
+Scripts:
+
+- [run_all_fasttrack_analysis.py](/data/html/dev/swedia-formants-2026/run_all_fasttrack_analysis.py)
+- [report_fixed_praat_fasttrack.py](/data/html/dev/swedia-formants-2026/report_fixed_praat_fasttrack.py)</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>another comparison i would like to see now is the angle difference from the reference/prototype sound. The values are in prototypes.txt. We could now compare the fixed-praat and the fasttrack values. So the first test is distance and bearing from the location of the prototype (which is set to approximate the Stockholm area) and see how this relates to the angle difference from the location to the villages (we&#x27;ll do the speakers later). This should be possible to do now</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Completed the village-level prototype comparison:
+
+https://scriptlogram.net/dev/swedia-formants-2026/Analyses/FastTrack_all_83/prototype_reference/
+
+The prototype’s Bark F1/F2 ellipse has:
+
+- Signed angle: **−2.39°**
+- Axis ratio: **2.10**
+- Reference location: `(185, 379)`, approximating Stockholm
+
+Village-minus-prototype angles are correctly treated as axial differences and wrapped to `−90°…+90°`.
+
+Main results:
+
+| Method | Distance vs signed difference | Distance vs absolute difference | Bearing model |
+|---|---|---|---|
+| Fixed Praat | `r=−.394, p=.00022` | `r=−.061, p=.583` | `R²=.084, permutation p=.031` |
+| FastTrack | `r=−.448, p=.000021` | `r=−.269, p=.014` | `R²=.078, permutation p=.036` |
+
+Interpretation: distance predicts the direction of angular change for both methods, especially FastTrack. It does not indicate increasing absolute divergence for fixed Praat; for FastTrack, absolute difference actually decreases somewhat with distance. This suggests geographical direction/bearing matters more than simple distance from Stockholm.
+
+Downloads are included for village values and statistics. The analysis script is [analyze_prototype_angle_geography.py](/data/html/dev/swedia-formants-2026/analyze_prototype_angle_geography.py).</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>what if we leave out Gotland and the four landscapes in Finland: Åboland, Nyland, Österbotten and Åland. This is not as arbitrary as it seems; we have data from a perception study we&#x27;d like to link this production data to, but that we have no listeners from these areas.</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>The listener-region sensitivity analysis is available here:
+
+https://scriptlogram.net/dev/swedia-formants-2026/Analyses/FastTrack_all_83/prototype_reference_listener_regions/
+
+It excludes 9 villages, leaving 74.
+
+| Relationship | Fixed Praat | FastTrack |
+|---|---:|---:|
+| Distance vs signed difference | `r=−.397, p=.00047` | `r=−.438, p=.000094` |
+| Distance vs absolute difference | `r=.015, p=.901` | `r=−.229, p=.050` |
+| Bearing sine/cosine model | `R²=.030, p=.335` | `R²=.103, p=.022` |
+
+The distance-versus-signed-angle result is essentially unchanged. The interesting change concerns bearing:
+
+- Fixed Praat’s bearing association disappears.
+- FastTrack’s bearing association remains and becomes somewhat stronger.
+- Neither method shows increasing absolute divergence from the prototype with distance.
+
+So the restricted data provide clearer evidence that FastTrack angles vary with geographical direction from the Stockholm reference, rather than simply becoming increasingly different with distance. This remains exploratory, but the exclusion is independently motivated by the perception-study population rather than by these results.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>could this be shown in two maps side-by-side and summarized in a report togehter with a link to a file with praat and fasttrack formant data</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Updated report:
+
+https://scriptlogram.net/dev/swedia-formants-2026/Analyses/FastTrack_all_83/prototype_reference_listener_regions/
+
+It now includes:
+
+- Fixed-Praat and FastTrack angle-difference maps side by side
+- Prototype location marked with a gold star
+- Distance and bearing diagnostic plots
+- Statistical summary
+- Explicit description of the excluded regions and villages
+- A matched downloadable formant table
+
+Direct CSV download:
+
+https://scriptlogram.net/dev/swedia-formants-2026/Analyses/FastTrack_all_83/prototype_reference_listener_regions/praat-fasttrack-speaker-vowels.csv
+
+The table contains 1,763 matched speaker-vowel rows from 74 villages:
+
+```text
+village,speaker,vowel,
+n_tokens_praat,praat_f1,praat_f2,
+n_tokens_fasttrack,fasttrack_f1,fasttrack_f2,
+x,y
+```</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>repest the analydid for individual speakers as well</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>The individual-speaker analysis is available here:
+
+https://scriptlogram.net/dev/swedia-formants-2026/Analyses/FastTrack_all_83/prototype_reference_listener_regions_speakers/
+
+It includes 204 complete speakers across the retained 74 villages. P-values account for village clustering.
+
+| Relationship | Fixed Praat | FastTrack |
+|---|---:|---:|
+| Distance vs signed difference | `r=−.260`, cluster `p=.0007` | `r=−.274`, cluster `p=.0004` |
+| Distance vs absolute difference | `r=.078`, cluster `p=.321` | `r=−.055`, cluster `p=.470` |
+| Bearing model | `R²=.021`, cluster `p=.193` | `R²=.070`, cluster `p=.0038` |
+
+The speaker-level results reinforce the village analysis:
+
+- Both methods show systematic directional angle change with distance.
+- Neither shows increasing absolute divergence from the prototype.
+- FastTrack shows a clear geographical-bearing effect; fixed Praat does not.
+
+The report includes jittered side-by-side speaker maps, distance and bearing plots, downloadable speaker angles, statistics, and a link to the matched Praat/FastTrack formant table.
+
+Script: [analyze_prototype_speaker_angle_geography.py](/data/html/dev/swedia-formants-2026/analyze_prototype_speaker_angle_geography.py)</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>This is the discussion of the perception results. Can you relate that to the formant-rotation results
+
+Significant variation in vowel category boundaries was attributed to dialectal area. Since 
+prototype placement on experiment screen was counterbalanced, and non-phonological effects 
+separated away, the boundary shifts cannot be attributed to visual, motor, acoustic or lexical
+bias. More likely, the results could indicate two opposite chain shifts in the vowel systems of 
+the dialects, as Northern listeners preferred the prototype that is adjacent clockwise along the 
+vowel space edge, while Southern listeners showed the opposite preference. It remains to 
+confirm specifically, which of the adjacent phoneme pairs are affected, whether these shifts can 
+be a drag or a push, and to what extent these shifts match the production patterns across dialects.</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>The production results are geographically structured in a way that is compatible with a chain-shift interpretation, but the apparent direction is not a straightforward match.
+
+In the traditional vowel-chart orientation used here:
+
+- More negative ellipse angles represent a clockwise rotation.
+- More positive angles represent a counterclockwise rotation.
+- Southern production generally has more negative—thus more clockwise—angles.
+- Northern production is relatively more counterclockwise.
+- This pattern is clearer with FastTrack, including its significant bearing effect.
+
+If listeners’ preference for an adjacent prototype directly reflects the direction of their own vowel-system displacement, the perception result predicts Northern systems shifting clockwise and Southern systems counterclockwise. That is opposite to the global production-ellipse tendency.
+
+However, this is not necessarily a contradiction:
+
+- Perceptual category-boundary movement need not have the same direction as category-center movement.
+- Listeners may perceptually compensate for their own production patterns, producing an inverse relationship.
+- The production ellipse measures the overall orientation of eight vowel means, whereas the perception experiment concerns boundaries between particular adjacent phonemes.
+- A global ellipse can rotate because of changes in only a few vowels, compression/expansion, or unequal movement around the perimeter.
+
+A suitable interpretation would therefore be:
+
+&gt; The production data independently show geographically structured rotation of the vowel space, particularly in the FastTrack analysis. Southern production spaces tend to rotate clockwise relative to the Stockholm-like prototype, while Northern spaces are relatively counterclockwise. This establishes a broad production correlate of the perceptual geographical contrast, although its apparent direction is opposite if perceptual prototype preference is interpreted directly as category displacement. Establishing whether the results reflect opposing chain shifts, perceptual compensation, or movements restricted to particular vowel pairs requires pair-specific comparison of production trajectories and perceptual boundaries.
+
+The next decisive analysis would compare the displacement direction of each adjacent vowel pair with the corresponding perceptual boundary shift, rather than relying on the global ellipse angle.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>can that be examined with this production data?</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Yes—partly, and this production dataset is well suited to the first test.
+
+For every speaker or village, we can compare each adjacent pair separately:
+
+- `/u:/–/o:/`
+- `/o:/–/ɑ:/`
+- `/ɑ:/–/æ:/`
+- `/æ:/–/e:/`
+- `/y:/–/ʉ̟:/`
+- `/ʉ̟:/–/ø:/`
+
+For each pair, we can calculate:
+
+- The pair midpoint relative to the Stockholm prototype midpoint
+- The direction and magnitude of each vowel’s displacement
+- Movement along the prototype vowel-space perimeter—clockwise versus counterclockwise
+- Changes in distance between the two vowels, indicating expansion or compression
+- Whether both vowels move together, or whether one appears to lead while the other follows
+
+These measures can then be modeled against geographical bearing, distance, or perception-study region. FastTrack and fixed Praat can be analyzed independently as a robustness comparison.
+
+The main limitation is causal interpretation. Production alone cannot establish a push chain versus a drag chain: that requires historical evidence, apparent-time evidence, or evidence about which vowel moved first. It can nevertheless show whether the geographically varying production movements:
+
+1. occur in the phoneme pairs implicated by perception;
+2. have clockwise or counterclockwise direction;
+3. reverse between Northern and Southern areas;
+4. concern translation, rotation, compression, or separation of the pair.
+
+The strongest next analysis would project each observed vowel onto the ordered perimeter defined by `prototypes.txt`, calculate signed clockwise displacement from its prototype, and plot/model those displacements by vowel and geography. That would connect much more directly to the perception result than the global ellipse angle does.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Yes this sounds more directed. The rotation idea was an idea to catch vowel spaces in a more general way, but has the problems that 1) we lack the vowel /i;/ in the perc data and therefore can&#x27;t really use in the production data, and 2) it may not really reflect what happens with the tongue in speech. So i like the idea of comparing vowel pairs.</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>I agree. The global ellipse is useful descriptively, but omitting `/i:/` makes its orientation partly an artefact of the truncated vowel inventory. It is also an acoustic summary, not a direct model of tongue movement.
+
+Pairwise analysis gives a closer match to the perception experiment. For each prototype pair directed from the first vowel to the second, we can define a local Bark-space axis and calculate:
+
+- Each vowel’s displacement along that axis:
+  - positive = toward the clockwise-adjacent vowel;
+  - negative = in the opposite direction.
+- Pair midpoint displacement: whether the pair moves together.
+- Separation change: compression versus expansion.
+- Perpendicular displacement: movement not captured by the proposed chain-shift direction.
+
+This distinguishes several possibilities that ellipse rotation conflates:
+
+- both vowels shift together;
+- the first approaches the second;
+- the second retreats from the first;
+- the pair expands or compresses;
+- movement occurs in another acoustic direction.
+
+We should calculate these for each individual speaker, using both fixed Praat and FastTrack, exclude the same listener-unrepresented regions, and then aggregate or model by geography. The most direct visualization would show signed along-pair displacement against geographical bearing or perception region, with one panel per vowel pair.
+
+That would let us test the actual claim: whether Northern production favors movement toward the clockwise-adjacent category and Southern production the reverse. It still cannot establish push versus drag causally, but it can identify which vowel moved and whether the production direction matches perception.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>yes, can you do a script that does this? is there anything more we need to decide first?</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Implemented and ran the pairwise production analysis:
+
+https://scriptlogram.net/dev/swedia-formants-2026/Analyses/FastTrack_all_83/vowel_pair_shifts_listener_regions/
+
+It covers 223 speakers across 74 villages. For each directed pair, it measures endpoint movement, midpoint translation, compression/expansion, perpendicular movement, and pair rotation relative to the prototypes.
+
+Main effects concentrate in:
+
+- `/u:/ → /o:/`
+- `/y:/ → /ʉ̟:/`
+- `/ʉ̟:/ → /ø:/`
+
+The first vowel generally moves toward the second farther south, often producing pair compression. `/ɑ:/ → /æ:/` and `/æ:/ → /e:/` show little systematic geographical movement. Fixed and FastTrack broadly agree, though FastTrack gives clearer `/u:/ → /o:/` effects.
+
+Because resource y increases southward, these production shifts are more clockwise in the south. That appears opposite to the perception result if perceptual preference is interpreted as direct movement of category centers. Compensation or boundary movement in the opposite direction remains plausible.
+
+The report includes plots and downloadable detailed measurements. P-values use village-clustered permutations but are not corrected across the many pairwise tests, so the pattern should currently be treated as exploratory.
+
+Script: [analyze_vowel_pair_shifts.py](/data/html/dev/swedia-formants-2026/analyze_vowel_pair_shifts.py)</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Here are some updates from a collaborator.
+
+First a plot &#x27;perc_boundaries.png&#x27; with the actual perceptual boundaries in the perception study
+
+Then a report &#x27;SweDia_prod_report_v1.pdf&#x27; with
+a) details on GAM studies on production and perception data
+b) geographic effects in production - comparing praat and fasttrack. note that the center/location of prototype vowels is moved to Linköping. The reference speaker is actually from there but does speak with a more &#x27;Stockholm&#x27;-like accent. Maybe hard to argue for this but maybe on grounds that I) it is more in the middle in the x-direction and II) it is also closer to the &#x27;population center&#x27; of Sweden. very little difference between praat and fasttrack but it could be argued that there is an effect of shifting away from reference prototypes. note this is not ellipse data, but delta f1 and delta f2, as seen in the prodiction GAM
+c) geographic effects in perception - testing different numbers of continua
+
+So how does this play together with the ellipse analysis. We have in mind an article maybe with this rough structure
+
+1.1 Perception, descriptive statistics. Individual sigmoids, category boundaries per continuum and dialect area;
+1.2 Perception, the GAM model. Only in F1 F2 space;
+2.1 Production, GAM models, one in F1 F2 space, one in PCA space;
+2.2 Production, ellipse analysis, Sweden maps with ellipse angles, one in F1 F2 space, one in PCA space.
+
+And i think we have a story to tell, even though it still is somewhat sketchy.
+
+What I have almost forgotten is that the ellipse analysis was actually quite explorative and was maybe only meant as step 1 of something larger. It actually originated with a larger discussion summarized here &#x27;vowel_system_geometry_analysis.pdf&#x27;, where other aspects of changed in vowel space (shear/compression) was discussed. Procrusted analysis was then introduced as a method. While I certainly would be prepared to continue and venture into more advanced analyses, I wonder if it is altogether worth it? Maybe we already have a reasonable and defensable story?</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Yes—you already have a reasonable and defensible article. I would not make a full Procrustes/shear analysis a prerequisite. The most valuable next step is a targeted, vowel-pair-level perception–production comparison, rather than adding increasingly elaborate global geometry.
+
+The analyses answer complementary questions:
+
+- The perception results show that category boundaries vary geographically, but importantly the pattern differs between continua.
+- The production GAMs show that F1 and F2 displacement from the reference vowel system varies geographically.
+- The close agreement between Praat and FastTrack makes that production result methodologically convincing.
+- The ellipse analysis asks a different, system-level question: whether the overall configuration of the vowel space changes orientation geographically.
+- Pairwise production measures can then identify which adjacent vowels actually produce that apparent rotation.
+
+I would therefore present the ellipses as an exploratory but informative summary—not as direct proof of two opposing chain shifts. Ellipse angle conflates rotation, compression, shear, and individual vowel movements; it is also affected by the missing `/iː/`. Its value is that it reveals a geographic system-level pattern that can subsequently be decomposed into specific pairs.
+
+The strongest paper structure would be:
+
+1. Perception: descriptive sigmoid curves and boundaries for each continuum and dialect area, using [perc_boundaries.png](/data/html/dev/swedia-formants-2026/perc_boundaries.png).
+2. Perception GAM: geographic effects, while explicitly showing that results depend on which continua are included.
+3. Production GAMs: geographical ΔF1/ΔF2 patterns, plus PCA as a tracking-independent robustness analysis.
+4. Production system geometry: ellipse angles as the broad overview, followed by adjacent-pair displacement/compression to explain what drives the geometry.
+5. Perception–production comparison: ask whether the production movement of each vowel pair has the direction expected from its perceptual boundary shift.
+
+The main inferential vulnerability is the perception analysis: the full eight-continuum effect is nonsignificant, whereas significance appears after excluding continua—especially `/æː–eː/` because it behaves oppositely. That five-continuum model should therefore be labelled conditional or exploratory. A continuum-by-geography model, or separate spatial estimates for each continuum, would be more persuasive than treating the opposite continuum as something to remove.
+
+The reference should be described operationally as a Linköping-based reference system. “Closer to the population centre” would sound post hoc. If necessary, show that changing the geographic anchor between Linköping and Stockholm does not materially change the distance/bearing conclusions. The underlying ΔF1/ΔF2 production GAMs are unaffected by that geographic choice.
+
+My recommendation is:
+
+- Keep the GAMs as the primary inferential analyses.
+- Keep ellipse maps as system-level exploratory/convergent evidence.
+- Add the vowel-pair analysis as the principal bridge between production and perception.
+- Defer full affine Procrustes, scaling, and shear decomposition unless reviewers specifically demand proof that the ellipse pattern represents genuine rotation.
+
+That yields a coherent claim: geographically patterned perceptual boundaries coexist with geographically patterned production configurations, and particular adjacent vowel pairs—not necessarily uniform rotation of the whole vowel system—appear to connect the two. It is a stronger and more cautious story than claiming general north–south chain shifts from ellipse angles alone.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Ah, yes this is helpful, we&#x27;ll return to the vowel-pairs.
+
+For now, more comments from collaborator:
+
+--
+
+/iː/ would be good to have. I have sigmoids for /eː/ - /iː/ and /iː/ - /yː/, but in particular /iː/ - /yː/ showed quite bad results (attached picture), and then I decided to remove also /eː/ - /iː/ because Ref speaker&#x27;s /iː/ is probably a bit special. He is from Linköping by the way, maybe worth testing and placing the prototype in Linköping instead of Stockholm? Formant values, Hz, of Ref speaker&#x27;s /iː/ are F1=320, F2=2100 Hz.
+But I took back these two continua and compared the perception models, attached the report in pdf. The report also contains the production models that I promised yesterday.
+
+Regarding what the tongue does during speech -- I read yesterday in Boersma &amp; Chládková (2011, ICPhS) and Chládková &amp; Escudero (2012, JASA) that, although F1 reflects vowel height quite well, F2 does not reflect vowel position nearly as well or directly on the front-back dimension. I made production models for F1 and F2 separately, to keep the direction of the distances where the pronunciation deviates from the reference values ​​(don&#x27;t know how to model two variables as one and the same Y predicted variable). The results seem to provide interesting basis for discussing the relationship of F1 and F2 and the pronunciation mechanism.
+I don&#x27;t see any significant geographical difference between fasttrack and regular praat. I didn&#x27;t have time to do a GAM model on PCA though. I also wonder if we can assume that PC1 and PC2 should always correspond to F1 and F2 -- that wasn&#x27;t the case with Leinonen 2010, she interprets her PC1 as voice quality.
+
+If /øː/ doesn&#x27;t affect the rotation, maybe it shifts the position of the ellipse? If that doesn&#x27;t provide interesting information, I agree with deleting this prototype from the ellipse analysis. But one thing I noticed in the perception results is that Norrland /æː/ seems to shrink its &quot;territory&quot; in vowel space, at the expense of both /eː/ and /aː/ (attached screenshot from presentation ppt). Given that, maybe the picture is more complex than what ellipse rotation can capture?.. Otherwise, you could throw away /æː/, as the equivalent for the perception model with 5 continua.
+
+Forgot to mention that I also lack perception data for Öland. That&#x27;s why I excluded the three Öland locations from the production analysis. Should I take them with me and run again? The perception maps seem to cover Öland because I have a data point in Kalmar.
+
+--
+
+Need comments on the above as well. I&#x27;m thinking
+
+a) removing /i:/, I&#x27;m basically ok with this
+
+b) fasttrack-praat. Hmm, yes the difference seems to disappear I get a slight diffrence with the ellipses, but only with signed differences. Also tried to improve the formant analysis with pca-informed analysis but there was no clear improvement
+
+c) formants-pca. But Leinonen (2008) states that &#x27;Plotting vowels in the PC1-PC2 plane showed a solution with strong resemblance to vowels in a formant plane.&#x27; And also Jacobi et al (2005) and the &#x27;original study&#x27; (Pols et al 1967) find that pc1-pc2 well corresponds to f1-f2 in bark
+
+d) removing /æː/, not really ok with this on the grounds that it makes things significant. I&#x27;d rather accept that the ellipse analysis was explorative but incomplete in this sense and go with your vowel-pair-level perception–production comparison
+
+Am i missing something?</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>No, I think your reading is right. I would add a few distinctions.
+
+**`/iː/`**
+
+Leaving it out is defensible because the available `/iː–yː/` perception data are unreliable and the reference `/iː/` may be atypical. But describe this as a limitation of the shared perception–production inventory—not as evidence that `/iː/` is irrelevant.
+
+It could still be useful to rerun production ellipses with `/iː/` as a sensitivity analysis. With F1 = 320 and F2 = 2100 Hz, it may materially change the ellipse’s upper/front edge. That result need not enter the primary perception comparison.
+
+**Praat versus FastTrack**
+
+Their agreement is a positive robustness result, even if it is scientifically unexciting. The small difference in signed ellipse deviation suggests that tracker choice can slightly affect a derived geometric statistic, but there is no persuasive evidence that one tracker reveals a different geographic production pattern.
+
+The PCA-informed experiment likewise supports retaining ordinary Praat/FastTrack rather than claiming a general correction. Its benefit was selective in difficult tokens, not a clear corpus-wide improvement.
+
+**PCA interpretation**
+
+The historical findings support saying that PC1–PC2 spectral spaces can strongly resemble Bark F1–F2 vowel spaces. They do not justify assuming that:
+
+- PC1 always equals F1;
+- PC2 always equals F2;
+- the correspondence has the same orientation in every dataset.
+
+PCA axes are determined by the covariance structure of the present corpus. Voice quality, spectral tilt, F3, and other spectral properties can enter either component. Consequently, the correct argument is empirical: correlate PCs with Bark F1/F2, inspect loadings, and assess whether the geographic pattern persists in both representations. PCA is valuable precisely because it is an independent spectral representation, not because it is automatically a transformed formant plane.
+
+Separate F1 and F2 GAMs are reasonable. A joint spatial response is possible through multivariate models, but it is not necessary here and would complicate interpretation.
+
+**`/æː/` and `/øː/`**
+
+I agree strongly about retaining `/æː/`. Its opposite perceptual behaviour may be one of the most linguistically interesting results. Removing it because it weakens a common geographic effect would erase evidence that the vowel system is not undergoing uniform rotation.
+
+Likewise, `/øː/` should not be removed merely because it contributes little to rotation. It may show translation, compression, or redistribution that ellipse angle cannot capture. Test influence transparently—for example, ellipse angles with and without each vowel—but keep a theoretically defined primary inventory.
+
+The observation that northern `/æː/` territory contracts from both sides is exactly why pairwise analysis is preferable:
+
+- `/ɑː–æː/` tests one boundary;
+- `/æː–eː/` tests the other;
+- their joint movement can represent contraction even when a single ellipse angle cannot.
+
+Perceptual “territory” and production separation are not identical measurements, but this gives a concrete correspondence hypothesis.
+
+**Öland and the geographic reference**
+
+The reference speaker’s actual Linköping origin is the strongest reason to locate the prototype there. I would use Linköping as the primary anchor and Stockholm only as a sensitivity analysis. This changes distance and bearing calculations, not the measured vowel values or ordinary geographic GAM surfaces.
+
+For Öland, include those production locations in production-only analyses. Excluding them because perception has no Öland listeners is appropriate only for a directly matched perception–production analysis. Kalmar’s spatial smooth visually covering Öland does not create perception observations there; it is model interpolation.
+
+So the clean distinction is:
+
+- all eligible locations for estimating production geography;
+- common geographic support for direct production–perception comparisons;
+- sensitivity analyses for exclusions and reference location.
+
+Overall, the emerging complication is useful: the evidence may describe geographically patterned, vowel-specific reorganization rather than a single rigid rotation. The ellipse analysis discovered that possibility; the pairwise analysis can test it more faithfully.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok, we actually already have a vowel-pair analysis, right. So, if we look at
+
+1) the perceptial boundaries as shown in perc_boundaries.png and
+2) the pairwise comparisons in Analyses/FastTrack_all_83/vowel_pair_shifts_listener_regions/pair_endpoint_shifts_vs_north_south.png
+3) the &#x27;decent&#x27; ellipse-north/south correlation in Analyses/BarkPCA_Praat_stratified_83_seed50/pca_praat_vowel_angle_maps.png
+
+a) What is the tension here? What is problematic with 3) compared to 1)?
+b) What is the resolve? What is it in 2) that helps us explain the tension?
+
+or have i got it completely wrong?</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>You have it basically right. The tension is real, and the pairwise results provide a plausible resolution.
+
+### a) The tension between perception and ellipse orientation
+
+The PCA ellipse plot shows an apparently simple global pattern: vowel spaces become progressively more negatively rotated toward the south (`r = −.54`). Taken literally, this might suggest one coherent north–south rotation or chain shift.
+
+But [perc_boundaries.png](/data/html/dev/swedia-formants-2026/perc_boundaries.png) is not that simple:
+
+- Boundary differences vary substantially between continua.
+- Some pairs show clear north–south displacement, while others show little.
+- `/æː–eː/` behaves in the opposite direction.
+- The perception inventory includes `/iː/`, whereas the production ellipse does not.
+- A perceptual boundary is not a vowel centroid: moving the boundary toward vowel B generally means expansion of A’s perceptual category, not necessarily movement of A’s production toward B.
+
+Thus the ellipse correlation cannot itself confirm the perceptual “clockwise in the north, counterclockwise in the south” interpretation. It compresses several different local processes—movement, compression, expansion and stability—into one angle. The additional warning is that this strong north–south relationship appears in PCA, while the corresponding Praat ellipse relationship is nearly absent (`r = +.05`).
+
+### b) How the pairwise results resolve it
+
+The [pairwise plot](/data/html/dev/swedia-formants-2026/Analyses/FastTrack_all_83/vowel_pair_shifts_listener_regions/pair_endpoint_shifts_vs_north_south.png) shows that the ellipse rotation is not produced by a uniform rotation of every vowel. It is driven particularly by movements of the first vowel toward the second in three pairs as one moves south:
+
+- `/uː/ → /oː/`: FastTrack `r = +.38`
+- `/yː/ → /ʉː/`: `r = +.25`
+- `/ʉː/ → /øː/`: `r = +.32`
+
+The other pairs show much weaker or absent trends, and the second endpoints are generally more stable. So the southern vowel space changes asymmetrically, especially along its upper portions. Those selective movements are sufficient to tilt the fitted ellipse even though the complete vowel system is not rotating rigidly.
+
+This provides the conceptual resolution:
+
+&gt; The ellipse detects a global geometric consequence of several uneven, pair-specific changes; the pairwise analysis identifies which vowels generate that consequence.
+
+It also accommodates `/æː–eː/`. Its exceptional perceptual behaviour need not invalidate the production ellipse pattern, because the global PCA angle can be dominated by the stronger `/uː–oː/`, `/yː–ʉː/`, and `/ʉː–øː/` production trends. Conversely, the ellipse cannot explain `/æː–eː/`; that pair must be examined locally.
+
+The defensible interpretation is therefore not “production and perception exhibit the same global rotation.” It is:
+
+&gt; Perception suggests geographically differentiated restructuring of particular category boundaries. Production shows corresponding geographic reorganization concentrated in particular adjacent vowel pairs. Their combined effect also appears as a north–south change in PCA vowel-space orientation.
+
+The remaining empirical step is to match the sign of each perceptual boundary displacement to the corresponding production endpoint movements. That comparison must account for the fact that boundary displacement and prototype displacement have different directional interpretations.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>thinking more about it, if we look at the way the perceptual boundaries are consistent in north-central-south (NCS) in perc_boundaries.png, this is not really something that would produce a similar consistent change in ellipse angle. we rather have a complex where the the NCS moves towards the front in some pairs and towards the back for some. and then there is /øː/ -&gt; /ʉː/, which is more generally &#x27;upward&#x27;. so its not really rotated in the way i thought first. So maybe this has bearing on how we should make the pairwise comparison for the production data. This should test in the direction of the arrows, basically put the north-south dimension along each vowel pair &#x27;line&#x27; individually. and this is probably what you have done. i just dont see how the production &#x27;boundaries&#x27; fall out along the vowel pair &#x27;lines&#x27;.</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Yes—this is the important correction. The perception plot does not describe one global rotation. It describes several pair-specific N–C–S shifts along differently oriented continua. Once those are combined geometrically, they need not produce any consistent change in ellipse angle.
+
+The existing production pairwise analysis already does approximately the projection you describe. For each ordered pair \(A \rightarrow B\), it defines the pair axis from the prototype of A toward the prototype of B and projects each produced endpoint onto that axis:
+
+\[
+p_A=(A_{\text{produced}}-A_{\text{prototype}})\cdot\hat{d}_{AB}
+\]
+
+\[
+p_B=(B_{\text{produced}}-B_{\text{prototype}})\cdot\hat{d}_{AB}
+\]
+
+Positive values mean movement in the arrow direction, toward B. These projections are then correlated with geographic north–south position. Consequently, each pair gets its own locally appropriate “front/back/up/down” direction.
+
+What the production plot does not contain is a production boundary. It only shows movements of the two vowel centroids. A boundary must be derived from them.
+
+The simplest production analogue is the midpoint:
+
+\[
+m_{AB}=\frac{A+B}{2}
+\]
+
+Projected onto the pair line, its displacement is:
+
+\[
+\Delta m_{AB}=\frac{p_A+p_B}{2}
+\]
+
+This tells us whether the entire production separation moves along the continuum. We should additionally calculate:
+
+\[
+\Delta s_{AB}=p_B-p_A
+\]
+
+which describes separation:
+
+- \(\Delta s&lt;0\): the production categories converge/compress.
+- \(\Delta s&gt;0\): they diverge/expand.
+- Similar \(p_A\) and \(p_B\): midpoint shifts, with little change in separation.
+- Only one endpoint moves: both midpoint and separation change.
+
+That distinction is essential. For example, the current plot indicates that southern `/uː/` moves toward `/oː/`, while `/oː/` changes comparatively little. This predicts both a midpoint shift and compression—not merely rotation.
+
+There is also a directionality trap. A perceptual boundary moving toward B normally expands the perceptual territory assigned to A. A production midpoint moving toward B arises when the production centroids collectively shift toward B. These have the same coordinate sign but not automatically the same phonological interpretation. We must explicitly define whether the perception values represent boundary location from A to B and then compare signed positions using identical A→B coding.
+
+So I would revise the comparison to show, for every perceptual continuum:
+
+1. perceptual boundary position along A→B versus north–south;
+2. production midpoint displacement along the same A→B axis versus north–south;
+3. production A–B separation versus north–south;
+4. optionally, the separate A and B endpoint projections.
+
+That would let the production “boundaries” fall directly onto the same one-dimensional pair axes as the perceptual boundaries. The ellipse analysis then becomes a secondary geometric summary, rather than the expected production equivalent of the perceptual pattern.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>yes lets try those comparisons</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>I added and ran a production-side comparison that places every measure along its own directed vowel-pair axis.
+
+The new FastTrack plot is [pairwise_boundary_analogues.png](/data/html/dev/swedia-formants-2026/Analyses/FastTrack_all_83/vowel_pair_shifts_listener_regions/pairwise_boundary_analogues.png). A [fixed-Praat version](/data/html/dev/swedia-formants-2026/Analyses/FastTrack_all_83/vowel_pair_shifts_listener_regions/pairwise_boundary_analogues_fixed.png) was also generated.
+
+Each row shows:
+
+- movements of both vowel endpoints;
+- displacement of their midpoint—the simplest production analogue of a boundary;
+- change in separation: compression or expansion.
+
+The emerging FastTrack pattern is:
+
+- `/uː–oː/`: clear southward midpoint movement toward `/oː/`, accompanied by compression.
+- `/oː–ɑː/`: little midpoint movement, but some compression.
+- `/ɑː–æː/`: essentially stable.
+- `/æː–eː/`: weak midpoint movement toward `/eː/`, little separation change.
+- `/yː–ʉː/`: midpoint movement toward `/ʉː/`, with modest compression.
+- `/ʉː–øː/`: midpoint movement toward `/øː/`, with clear compression.
+
+This confirms your revised interpretation: there is no uniform rotation. Instead, different continua undergo different combinations of translation and compression, each along its own acoustic direction.
+
+The script is [plot_pairwise_boundary_analogues.py](/data/html/dev/swedia-formants-2026/plot_pairwise_boundary_analogues.py). The exact perception–production overlay still requires the underlying perceptual boundary values; only `perc_boundaries.png` is currently available. A CSV containing at least `continuum`, `area` or coordinates, and `boundary_position` would let us compare their signed N–C–S patterns directly without unreliable digitization from the PNG.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok, got it! so compared with the &#x27;arrows&#x27; in the perception plot, in essence
+
+  - /uː–oː/: clear in opposite direction
+  - /oː–ɑː/: little movement
+  - /ɑː–æː/: little movement
+  - /æː–eː/: weak in the same direction
+  - /yː–ʉː/: modest in opposite direction
+  - /ʉː–øː/: clear in opposite direction
+
+interestingly, though, is that looking at north-south along the &#x27;lines&#x27; just from a production perspective then in deed point towards a clockwise movement</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Yes—that is a much better description of the result.
+
+Relative to the perceptual arrows, production shows:
+
+- three reasonably clear opposite-direction relationships: `/uː–oː/`, `/yː–ʉː/`, `/ʉː–øː/`;
+- one weak same-direction relationship: `/æː–eː/`;
+- little systematic displacement for `/oː–ɑː/` and `/ɑː–æː/`.
+
+At the same time, considered purely as production, the pair-specific movements combine into an approximately clockwise reorganization from north to south. This explains why the PCA ellipse can detect a north–south angle gradient: it summarizes the cumulative geometry of several locally directed changes.
+
+The important qualification is that this is not rigid rotation. Much of it comes from one endpoint moving while the other remains comparatively stable, producing compression as well as displacement. A good formulation would be:
+
+&gt; Production exhibited a broadly clockwise north-to-south reorganization of the vowel space, generated primarily by asymmetric displacement and compression in selected vowel pairs rather than uniform rotation of all vowel categories. These production changes were predominantly opposite in direction to the corresponding perceptual boundary shifts.
+
+That opposition could be theoretically interesting rather than contradictory. If production categories move closer together, listeners may compensate by shifting a perceptual boundary in the opposite direction to preserve one category’s perceptual territory. But that remains a hypothesis: boundary movement depends on which response category expands, so the perception-continuum coding must be verified before making the compensation claim.
+
+Thus the ellipse provides a useful production-only summary; the pairwise analysis explains its mechanism; and the perception comparison reveals that production-centroid and perceptual-boundary movements need not have the same sign.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>so is it fair to say that what drives the rotation is in essence absolute position of /u:/?</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>It is fair to say that `/uː/` is probably a major driver, but not yet that it alone drives the rotation.
+
+In the pairwise plot, `/uː/` has:
+
+- the strongest north–south endpoint trend;
+- large absolute displacement from its prototype;
+- a geometrically extreme position, giving it considerable leverage on the fitted ellipse.
+
+However, `/yː/` and `/ʉː/` also move systematically, and the ellipse angle depends on their combined configuration. Moreover, “absolute position” and “north–south change” should be distinguished: a consistently displaced `/uː/` affects the baseline ellipse, whereas geographical variation in `/uː/` affects the angle correlation.
+
+The direct test is a leave-one-vowel-out influence analysis: recalculate each village’s ellipse and its north–south correlation after removing `/uː/`, then repeat for every vowel. If removing `/uː/` largely eliminates the angle correlation while the other exclusions do not, the claim is justified.
+
+For now, the safe wording is:
+
+&gt; The north–south rotation appears to be driven substantially by geographical displacement of `/uː/`, together with smaller coordinated changes among the front rounded vowels.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>oh, yes that leave-one-out whould be very good, please run that</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>The leave-one-vowel-out result shows that `/uː/` is a major contributor to the PCA rotation, but not the only one.
+
+[View the comparison plot](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_Praat_stratified_83_seed50/ellipse_leave_one_vowel_out/leave_one_vowel_out_correlations.png)
+
+For PCA:
+
+| Configuration | Pearson r with north→south |
+|---|---:|
+| All eight vowels | −0.54 |
+| Without `/uː/` | **−0.31** |
+| Without `/æː/` | **−0.20** |
+| Without `/oː/` | −0.43 |
+| Without `/ɑː/` | −0.46 |
+| Without `/eː/` | −0.51 |
+| Without `/yː/` | −0.53 |
+| Without `/ʉː/` | −0.54 |
+| Without `/øː/` | −0.53 |
+
+Thus:
+
+- Removing `/uː/` substantially weakens the correlation, confirming its importance.
+- Surprisingly, removing `/æː/` weakens Pearson correlation even more. However, the corresponding Spearman correlation remains appreciable (`ρ = −0.48`), suggesting that `/æː/` particularly affects linearity, leverage or extreme village values—not necessarily the underlying geographic ordering.
+- Removing `/ʉː/` or `/øː/` barely changes the ellipse correlation despite their clear pairwise production movements.
+- The PCA relationship therefore arises mainly from the geometry involving `/uː/`, `/æː/`, and to a lesser extent `/oː–ɑː/`, rather than the equal contribution of all vowels.
+
+There is also a revealing Praat result: the complete ellipse has no north–south relationship (`r = +0.05`), but removing `/uː/` produces `r = +0.32`. This reinforces that `/uː/` has unusually strong leverage, while also showing that PCA and formant ellipses are not measuring exactly the same geometry.
+
+The safest conclusion is:
+
+&gt; `/uː/` is an important driver of the PCA ellipse rotation, but the correlation depends on its interaction with the broader vowel-space configuration, especially `/æː/`; it is not simply an `/uː/` effect.
+
+The underlying results are in [leave_one_vowel_out_correlations.csv](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_Praat_stratified_83_seed50/ellipse_leave_one_vowel_out/leave_one_vowel_out_correlations.csv), and the reproducible script is [analyze_ellipse_leave_one_vowel_out.py](/data/html/dev/swedia-formants-2026/analyze_ellipse_leave_one_vowel_out.py).</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Can we go back to the pairwise comparisons and do these for PCA as well? We dont really have any midpoints (that would req including the prototype vowels in the pca, but we cant do that just yet), but we should be able to do the endpoints and the separation change per vowel pairs, right?</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Yes. I added and ran the PCA pairwise analysis.
+
+[View the PCA pairwise plot](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_Praat_stratified_83_seed50/pca_vowel_pair_shifts_listener_regions/pca_pair_shifts_vs_north_south.png)
+
+Because synthetic prototypes cannot currently be projected reliably into PCA space:
+
+- Each A→B axis is defined by the corpus-wide mean PCA positions of A and B.
+- Endpoint values are deviations from each vowel’s global centroid along that axis.
+- Separation is compared with the global mean A–B separation.
+- No midpoint is interpreted as a production boundary.
+
+Main PCA results:
+
+- `/uː–oː/`: both endpoints shift toward `/oː/` in the south; separation remains approximately constant. This looks more like translation than compression.
+- `/oː–ɑː/`: clear southward compression (`r = −.30`, cluster `p = .0014`).
+- `/ɑː–æː/`: little convincing change.
+- `/æː–eː/`: weak same-direction movement of both endpoints, without separation change.
+- `/yː–ʉː/`: `/ʉː/` shifts along the directed axis, but separation change is weak.
+- `/ʉː–øː/`: clear compression (`r = −.27`, cluster `p = .0016`).
+
+This partly converges with the formant analysis—especially for `/ʉː–øː/`—but it also clarifies why PCA ellipse rotation is not simply the formant geometry reproduced in another coordinate system. PCA shows `/uː–oː/` mainly translating together, whereas FastTrack F1/F2 showed `/uː/` moving much more than `/oː/`, producing compression.
+
+Outputs:
+
+- [Speaker-pair data](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_Praat_stratified_83_seed50/pca_vowel_pair_shifts_listener_regions/pca_speaker_vowel_pair_shifts.csv)
+- [Geographic statistics](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_Praat_stratified_83_seed50/pca_vowel_pair_shifts_listener_regions/pca_vowel_pair_geographic_statistics.csv)
+- [Global PCA vowel centroids](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_Praat_stratified_83_seed50/pca_vowel_pair_shifts_listener_regions/pca_global_vowel_centroids.csv)
+- [Analysis script](/data/html/dev/swedia-formants-2026/analyze_pca_vowel_pair_shifts.py)</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Ah, this is helpful!
+
+Two things:
+
+1) We can use the corpus-wide mean PCA as proxy for midpoints, right?
+
+2) It is quite clear from the separation change plots that the relationship is not strictly linear; especially in the south there seems to be a &#x27;bend&#x27; or a more curvy structure.
+
+There are two ways to handle this
+a) use some non-linear regression
+b) think more in regions than a single north-south continuum; this is actually in line with the perc results, we could simply separate in three partitions, or we could use the traditional Norrland/Svealand/Götaland distinction, sometimes referred to as the &#x27;lands of Sweden&#x27;. This is not coded in resource.txt but you can find a mapping for the villages at eg https://swedia.ling.gu.se/snabbmeny.html
+
+What do you think of this?</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Yes on both points, with some care.
+
+1. Corpus-wide PCA midpoints
+
+We can define the PCA reference midpoint for pair A–B as:
+
+\[
+M_{AB}=(\bar A+\bar B)/2
+\]
+
+where \(\bar A\) and \(\bar B\) are their corpus-wide PCA centroids. Each speaker’s pair midpoint can then be projected onto the global A→B axis and expressed relative to \(M_{AB}\).
+
+That is a valid internal production reference. It is not a perceptual boundary or an external prototype, but it gives us:
+
+- pair translation along the continuum;
+- pair compression or expansion;
+- separate endpoint movements.
+
+For maximum rigor, the reference could be calculated leave-one-village-out, although with 74 villages the difference will probably be tiny. When applying the analysis to new material, both PCA loadings and global centroids must remain fixed.
+
+2. Curvature and regions
+
+I agree that several plots look nonlinear, particularly because some changes accelerate or reverse in southern Sweden. A straight north–south correlation is therefore too restrictive.
+
+I would use both approaches, but give them different roles:
+
+- Primary inferential analysis: a low-complexity smooth of `resource_y`, such as a GAM with `s(y, k=4 or 5)`.
+- Better geographic check: a two-dimensional `s(x,y)` smooth, because an apparent southern bend could reflect east–west regional composition rather than genuine curvature along latitude.
+- Descriptive perception comparison: estimated means for North, Central and South using exactly the same regional partition as the perception study.
+- Traditional Norrland–Svealand–Götaland: a useful secondary analysis, not a replacement for continuous geography.
+
+The SweDia site does explicitly organize Swedish locations into [Götaland, Svealand and Norrland](https://swedia.ling.gu.se/snabbmeny.html), so that mapping would be principled rather than data-driven. But those “lands” are broad administrative-historical divisions and may not coincide with the perception study’s dialect-area coding. We should not silently treat the two classifications as equivalent.
+
+My preferred model sequence would therefore be:
+
+\[
+\text{pair measure} \sim s(y) + s(\text{village, random})
+\]
+
+followed by:
+
+\[
+\text{pair measure} \sim s(x,y) + s(\text{village, random})
+\]
+
+and then N–C–S group means for direct visual comparison with perception.
+
+The pair measures should be modelled separately:
+
+- first endpoint displacement;
+- second endpoint displacement;
+- corpus-referenced midpoint displacement;
+- separation change.
+
+Most importantly, we should not force all pairs to share one geographic shape. Each perceptual continuum already suggests a different pattern. The likely result is not a general rotation but a collection of pair-specific regional curves whose combined geometry happens to resemble clockwise production reorganization.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok, go ahead</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Done. The PCA pair analysis now includes corpus-referenced midpoint displacement, nonlinear north–south fits, traditional Swedish-region summaries, and exploratory 2D geographic surfaces.
+
+Main outputs:
+
+- [Nonlinear north–south curves](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_Praat_stratified_83_seed50/pca_vowel_pair_geography/pca_pair_nonlinear_north_south.png)
+- [Norrland–Svealand–Götaland comparison](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_Praat_stratified_83_seed50/pca_vowel_pair_geography/pca_pair_lands.png)
+- [Two-dimensional geographic surfaces](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_Praat_stratified_83_seed50/pca_vowel_pair_geography/pca_pair_spatial_surfaces.png)
+- [Model statistics](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_Praat_stratified_83_seed50/pca_vowel_pair_geography/pca_pair_nonlinear_statistics.csv)
+- [Village-level data](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_Praat_stratified_83_seed50/pca_vowel_pair_geography/pca_pair_village_means.csv)
+
+The results strongly support your observation: many relationships are nonlinear. Particularly clear nonlinear separation patterns occur for:
+
+- `/uː–oː/`
+- `/oː–ɑː/`
+- `/æː–eː/`
+- `/yː–ʉː/`
+- `/ʉː–øː/`
+
+The three-lands plot is especially revealing. Svealand frequently differs from both Norrland and Götaland, while Götaland itself has substantial internal variation. This means the apparent “southern bend” is not adequately described as a single linear north–south change.
+
+The 2D surfaces confirm that longitude also matters for several pairs, particularly `/oː–ɑː/`, `/ɑː–æː/`, and `/æː–eː/`. Therefore, the nonlinear latitude patterns partly reflect geographically distinct subregions—not just a curved response to latitude.
+
+The emerging interpretation is:
+
+&gt; PCA vowel-pair geometry varies regionally rather than following one continuous north–south rotation. Several pairs show a distinct Svealand configuration, while others differentiate parts of Götaland or Norrland.
+
+The three-land classification follows SweDia’s own grouping into [Götaland, Svealand and Norrland](https://swedia.ling.gu.se/snabbmeny.html). These fits are exploratory: the spline and 2D-model p-values are unadjusted across 24 pair/measure tests.
+
+One scope detail remains: this run inherits the existing listener-region dataset and therefore still includes the three Öland villages. They are appropriate for production-only description, but should be excluded in the final directly matched perception–production analysis because there are no Öland listeners.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Hmm, can this be done by speaker? And i think the original three-column-plot, with a) both endpoints, b) midpoints and c) separation was better. And i think just the non-linear regression is enough.</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Done. The new plot uses the requested three-column structure:
+
+1. Both vowel endpoints
+2. Corpus-referenced midpoint
+3. Separation change
+
+[View the individual-speaker nonlinear plot](/data/html/dev/swedia-formants-2026/Analyses/BarkPCA_Praat_stratified_83_seed50/pca_vowel_pair_geography/pca_pair_speaker_nonlinear_three_columns.png)
+
+Each faint point is an individual speaker. The nonlinear curves are fitted to village means so villages with additional speakers do not receive disproportionate weight.
+
+This makes the curved structure considerably clearer. Notable patterns include:
+
+- `/uː–oː/`: nonlinear joint displacement plus marked regional variation in separation.
+- `/oː–ɑː/`: strong southern endpoint reversal and rapidly increasing compression in the far south.
+- `/ɑː–æː/`: curved midpoint movement but comparatively weak separation evidence.
+- `/æː–eː/`: both endpoints and midpoint follow a pronounced arch.
+- `/yː–ʉː/`: relatively stable midpoint but nonlinear separation.
+- `/ʉː–øː/`: little midpoint displacement but strong curved expansion-to-compression pattern.
+
+The displayed p-values test whether the nonlinear terms improve on a straight line, using village-balanced observations. They are exploratory and uncorrected for multiple testing, and the extreme ends of the curves should be treated cautiously because fewer villages constrain them.
+
+The updated implementation is in [analyze_pca_pair_geography.py](/data/html/dev/swedia-formants-2026/analyze_pca_pair_geography.py).</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>and now we can do the same for fasttrack formants</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Done. The FastTrack analysis now uses the same individual-speaker, three-column nonlinear layout as the PCA analysis:
+
+[View the FastTrack nonlinear pair plot](/data/html/dev/swedia-formants-2026/Analyses/FastTrack_all_83/fasttrack_vowel_pair_nonlinear_listener_regions/fasttrack_pair_speaker_nonlinear_three_columns.png)
+
+The major nonlinear patterns are:
+
+- `/uː–oː/`: strongly curved endpoint and midpoint displacement, but weaker evidence for nonlinear separation.
+- `/oː–ɑː/`: strongly curved midpoint and separation, including increased far-southern compression.
+- `/ɑː–æː/`: comparatively stable midpoint and separation.
+- `/æː–eː/`: nonlinear midpoint movement and separation.
+- `/yː–ʉː/`: principally a gradual displacement; little evidence that curvature improves the fit.
+- `/ʉː–øː/`: likewise shows a broader geographic trend rather than strong nonlinearity.
+
+This is useful convergence with PCA: both representations show especially complex geography for `/uː–oː/`, `/oː–ɑː/`, and `/æː–eː/`. PCA indicates additional nonlinear separation patterns that are less evident in formants.
+
+As before, individual speakers are shown as points, but curves and tests use village-balanced means. The displayed p-values specifically test improvement over a straight line—not whether any geographic relationship exists.
+
+Files:
+
+- [Nonlinear statistics](/data/html/dev/swedia-formants-2026/Analyses/FastTrack_all_83/fasttrack_vowel_pair_nonlinear_listener_regions/fasttrack_pair_nonlinear_statistics.csv)
+- [Village means](/data/html/dev/swedia-formants-2026/Analyses/FastTrack_all_83/fasttrack_vowel_pair_nonlinear_listener_regions/fasttrack_pair_village_means.csv)
+- [Script](/data/html/dev/swedia-formants-2026/analyze_fasttrack_pair_nonlinear_geography.py)</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ah, we can try with corpus-wide formant means as well</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Done. FastTrack is now expressed relative to corpus-wide formant means, making it methodologically parallel to the PCA version.
+
+[View the corpus-referenced FastTrack plot](/data/html/dev/swedia-formants-2026/Analyses/FastTrack_all_83/fasttrack_corpus_reference_pair_nonlinear_listener_regions/fasttrack_corpus_reference_speaker_nonlinear_three_columns.png)
+
+This changes both:
+
+- the zero point: each vowel is measured relative to its corpus mean;
+- the A→B axis: it runs between the corpus-wide mean positions rather than the external prototypes.
+
+The correspondence with PCA is now clearer:
+
+- `/uː–oː/`: pronounced far-southern bend in endpoints and midpoint.
+- `/oː–ɑː/`: strong nonlinear midpoint movement and southern compression.
+- `/ɑː–æː/`: comparatively little midpoint or separation change.
+- `/æː–eː/`: curved midpoint and separation pattern.
+- `/yː–ʉː/`: mostly gradual displacement, with little curvature.
+- `/ʉː–øː/`: little midpoint curvature, but a gradual shift toward compression in the south.
+
+An important result is that changing from prototype-defined to corpus-defined pair axes changes some apparent directions, especially `/uː–oː/`. This means comparisons with PCA should use the corpus-defined analysis, while comparisons with synthetic perceptual continua may still benefit from prototype-defined formant axes.
+
+Files:
+
+- [Speaker-pair measurements](/data/html/dev/swedia-formants-2026/Analyses/FastTrack_all_83/fasttrack_corpus_reference_pair_nonlinear_listener_regions/fasttrack_corpus_reference_speaker_pairs.csv)
+- [Village means](/data/html/dev/swedia-formants-2026/Analyses/FastTrack_all_83/fasttrack_corpus_reference_pair_nonlinear_listener_regions/fasttrack_corpus_reference_village_means.csv)
+- [Nonlinear statistics](/data/html/dev/swedia-formants-2026/Analyses/FastTrack_all_83/fasttrack_corpus_reference_pair_nonlinear_listener_regions/fasttrack_corpus_reference_nonlinear_statistics.csv)
+- [Global formant centroids](/data/html/dev/swedia-formants-2026/Analyses/FastTrack_all_83/fasttrack_corpus_reference_pair_nonlinear_listener_regions/fasttrack_global_vowel_centroids.csv)
+- [Script](/data/html/dev/swedia-formants-2026/analyze_fasttrack_corpus_reference_pairs.py)</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>And now i am sort of contradict myself, but it would actually be interesting to summarize the pca and fastrack data in plots similar to the perc_boundaries.png
+
+So maybe again split the speakers in three roughly similar-sized groups (south, central, north), calculate a &#x27;midpoint&#x27; for each vowel pair and group. Then use some corpus-wide mean value as vowel anchor points, dont use the prototypes, and plot the midpoints along the axes. If there is a s-c-n &#x27;direction&#x27;, add arrows. I hope this description makes sense. 
+
+I do realize this is very &#x27;summarative&#x27;, but it could be useful as a point to reason from.</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Done. This produces a perception-style descriptive summary for PCA and FastTrack side by side:
+
+[View PCA–FastTrack regional midpoints](/data/html/dev/swedia-formants-2026/Analyses/PCA_FastTrack_regional_midpoints/pca_fasttrack_regional_pair_midpoints.png)
+
+The 225 shared speakers were divided without splitting villages:
+
+- North: 75 speakers, 23 villages
+- Central: 76 speakers, 26 villages
+- South: 74 speakers, 25 villages
+
+Open circles are corpus-wide vowel anchors. Red, black and blue points are the North, Central and South pair midpoints projected onto each corpus-defined A→B axis. Arrows run North→South only when the three groups are strictly monotonic.
+
+The summary is quite revealing:
+
+- PCA has monotonic N–C–S ordering only for `/uː–oː/`.
+- FastTrack has monotonic ordering for `/uː–oː/` and `/yː–ʉː/`.
+- The FastTrack `/uː–oː/` direction is opposite the PCA direction.
+- Most other pairs are non-monotonic, consistent with the curved relationships seen previously.
+
+So the descriptive plot argues against a single general N–C–S rotation. `/uː–oː/` is again especially influential, but its acoustic direction depends on whether vowel quality is represented through PCA spectra or F1/F2.
+
+These arrows are summaries, not significance tests; strict monotonicity can also be sensitive to group boundaries.
+
+Data and reproducibility:
+
+- [Regional midpoint values](/data/html/dev/swedia-formants-2026/Analyses/PCA_FastTrack_regional_midpoints/regional_pair_midpoints.csv)
+- [Village group assignments](/data/html/dev/swedia-formants-2026/Analyses/PCA_FastTrack_regional_midpoints/regional_group_assignments.csv)
+- [Settings](/data/html/dev/swedia-formants-2026/Analyses/PCA_FastTrack_regional_midpoints/settings.json)
+- [Script](/data/html/dev/swedia-formants-2026/plot_pca_fasttrack_regional_midpoints.py)</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Yeah, i really like these plots, but they make things a bit tricky. If anything the pca shows that central is often the one who is separate from the others, and often their midpoints are closer to the more &#x27;backward&#x27; vowel in a pair. This is not really reflected in the fasttrack, where tendencies are much more unclear.</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Exactly. The PCA plot suggests something closer to a “central Swedish configuration” than a simple north–south progression. For several pairs, Central speakers occupy an extreme position—often with the midpoint displaced toward the second, apparently more backward vowel—while North and South are closer together.
+
+FastTrack does not reproduce this consistently. That leaves three possibilities:
+
+- PCA detects vowel-system information that F1/F2 misses, such as higher-formant structure, spectral shape or voice quality.
+- PCA is sensitive to non-vowel differences correlated with region, including phonation or recording characteristics.
+- The effect is genuine but concerns pair-specific spectral quality rather than movement in the F1/F2 plane.
+
+This is not necessarily bad, but it changes the story. PCA should not be described simply as confirming formant-space movements. Instead:
+
+&gt; PCA reveals a marked Central-versus-peripheral spectral organization, whereas conventional formants show weaker and less consistent regional differentiation.
+
+Before interpreting “backward,” I would quantify the Central–North and Central–South contrasts with village-bootstrap confidence intervals. In PCA space, “toward the backward vowel” only means movement toward that vowel’s corpus spectral centroid; it is not necessarily articulatory backing.
+
+The descriptive plot may therefore be showing two partially different phenomena: formant geometry and broader spectral dialect differentiation. That is scientifically interesting, but the perception comparison should probably remain anchored primarily in F1/F2, with PCA as complementary evidence.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>for completeness, can you do a similar plot but with the
+  fixed-praat formant analysis?</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Done. The fixed-Praat comparison uses the same 75/76/74-speaker geographic groups and corpus-wide formant anchors:
+
+[View PCA versus fixed Praat](/data/html/dev/swedia-formants-2026/Analyses/PCA_FixedPraat_regional_midpoints/pca_fixed_praat_regional_pair_midpoints.png)
+
+Fixed Praat resembles FastTrack closely. Its only strictly monotonic North→Central→South pair is `/yː–ʉː/`. Unlike FastTrack, `/uː–oː/` is not quite monotonic because the Central midpoint interrupts the ordering.
+
+This strengthens the previous conclusion:
+
+- PCA prominently distinguishes Central speakers for several pairs.
+- Both formant methods show much smaller, less systematic regional differences.
+- The discrepancy is unlikely to be primarily caused by FastTrack’s tracking procedure.
+
+The underlying values are in [regional_pair_midpoints.csv](/data/html/dev/swedia-formants-2026/Analyses/PCA_FixedPraat_regional_midpoints/regional_pair_midpoints.csv), with group assignments and settings in the same directory.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>maybe the equal-sized three-way split is misleading, what alternatives are there?</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Yes. Equal-sized thirds are useful visually, but their “Central” group is an arbitrary latitude band and may manufacture a central-versus-peripheral pattern.
+
+Better alternatives are:
+
+1. **Use the perception study’s exact North/Central/South classification.**  
+   Best choice for direct perception–production comparison. The groups then have the same theoretical meaning, even if sample sizes differ.
+
+2. **Use Norrland–Svealand–Götaland.**  
+   Historically and geographically interpretable, independently defined, and reproducible. However, these divisions may not match the perceptual dialect areas, and Götaland contains considerable internal variation.
+
+3. **Avoid groups and use nonlinear continuous estimates.**  
+   Fit the geographic curve, then plot predicted midpoints at three predefined locations—perhaps the median latitude of the perception study’s northern, central and southern listener groups. This produces three dots without assigning every production speaker to an arbitrary bin.
+
+4. **Use fixed geographic boundaries.**  
+   Predefine latitude cutoffs based on geography or dialectology rather than sample quantiles. This is defensible if there is an external rationale for the boundaries.
+
+5. **Spatial clustering based only on coordinates.**  
+   Possible, but less attractive: clusters may be unstable and difficult to interpret. Clustering must not use the acoustic outcomes, or it becomes circular.
+
+My preference is:
+
+- use nonlinear continuous models as the primary analysis;
+- create the boundary-style summary using the perception study’s actual N/C/S assignments;
+- use Norrland–Svealand–Götaland as a sensitivity analysis.
+
+That would reveal whether the PCA “Central” effect is genuinely associated with the perceptual Central region or merely produced by equal-sized latitude partitioning. Unequal group sizes are not a problem; we can show bootstrap confidence intervals and speaker/village counts.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>yes lets try what you are suggesting</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>I reran the midpoint summary using the independently defined “lands of Sweden” rather than equal-sized latitude thirds.
+
+- [PCA versus FastTrack](/data/html/dev/swedia-formants-2026/Analyses/PCA_FastTrack_lands_midpoints/pca_fasttrack_lands_pair_midpoints.png)
+- [PCA versus fixed Praat](/data/html/dev/swedia-formants-2026/Analyses/PCA_FixedPraat_lands_midpoints/pca_fixed_praat_lands_pair_midpoints.png)
+
+Groups now contain:
+
+- Norrland: 68 speakers
+- Svealand: 54 speakers
+- Götaland: 103 speakers
+
+The classification follows [SweDia’s own organization](https://swedia.ling.gu.se/snabbmeny.html).
+
+The central pattern does not disappear. In PCA, Svealand remains distinctive for several pairs, although `/uː–oː/` is the only strictly monotonic Norrland→Svealand→Götaland sequence.
+
+The formant summaries become somewhat more structured:
+
+- FastTrack is monotonic for `/uː–oː/`, `/æː–eː/`, and `/yː–ʉː/`.
+- Fixed Praat is monotonic for `/ɑː–æː/`, `/æː–eː/`, and `/yː–ʉː/`.
+- Agreement is strongest for `/æː–eː/` and `/yː–ʉː/`.
+
+So the PCA Svealand effect is not merely an artifact of equal-sized thirds, but the precise arrows remain sensitive to grouping and acoustic representation. The nonlinear continuous plots should remain primary; these three-group diagrams are descriptive summaries.
+
+The exact perception-study N/C/S assignments are not available in the repository. If the collaborator supplies that village/listener mapping, we can run the most directly comparable version without guessing the boundaries.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Maybe fasttrack makes errors that affect the results.
+
+Do we still have the 400-ish examples from the fasttrack vs praat-fixed test? These formant values are manually judged to be correct. Its a small sample but maybe they can give an indication of whether it is worth to do more manual correction.
+
+It may be worth trying.</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Yes—the fixed-versus-FastTrack review is intact, and I tested its potential correction impact.
+
+The review contains 400 main trials plus 20 repeats. For the 400 main tokens:
+
+| Judgment | Tokens |
+|---|---:|
+| Both good | 296 |
+| FastTrack preferred | 81 |
+| Fixed Praat preferred | 9 |
+| Both bad | 11 |
+| Uncertain | 3 |
+
+So there is no evidence for generally replacing or manually correcting FastTrack. It was preferred nine times as often as fixed Praat.
+
+However, the nine fixed-preferred cases include some very large FastTrack F2 errors—often 750–1150 Hz—especially for `/eː/`, `/æː/`, and `/øː/`. In the representative 240-token sample, substituting fixed values in seven cases changed the weighted `/eː/` mean F2 by about 73 Hz. That estimate is unstable, but it demonstrates that rare catastrophic errors can influence vowel centroids.
+
+[View the correction impact](/data/html/dev/swedia-formants-2026/Analyses/FastTrack_review_400_correction_impact/manual_selection_impact.png)
+
+One qualification: these are not hand-entered corrected formants. The reviewer selected FastTrack, fixed Praat, both acceptable, or neither. I constructed a “review-selected” value by:
+
+- retaining FastTrack when it was preferred or both were good;
+- substituting fixed Praat when fixed was preferred;
+- excluding both-bad and uncertain tokens.
+
+Large FastTrack–fixed disagreement is useful as a review flag, but not an automatic correction rule. Among the 45 tokens differing by at least 300 Hz in F2:
+
+- FastTrack was preferred for 29;
+- fixed was preferred for 7;
+- both were bad for 6;
+- two were both good and one uncertain.
+
+My assessment is therefore:
+
+&gt; More random manual correction is unlikely to be worthwhile, but targeted review of influential high-disagreement tokens could be valuable.
+
+The best next review would target tokens that both:
+
+- show large tracker disagreement or implausible F2;
+- exert substantial influence on speaker medians, regional midpoints, or the nonlinear bends.
+
+That would directly test whether a small number of catastrophic errors are creating the ambiguous formant geography.
+
+Outputs:
+
+- [Review-selected token data](/data/html/dev/swedia-formants-2026/Analyses/FastTrack_review_400_correction_impact/review_selected_tokens.csv)
+- [Weighted vowel means](/data/html/dev/swedia-formants-2026/Analyses/FastTrack_review_400_correction_impact/weighted_vowel_means_raw_vs_selected.csv)
+- [Judgments by vowel and sample](/data/html/dev/swedia-formants-2026/Analyses/FastTrack_review_400_correction_impact/judgments_by_part_and_vowel.csv)
+- [Analysis script](/data/html/dev/swedia-formants-2026/analyze_fasttrack_review_correction_impact.py)</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Well my idea was to actually make an f1/f2 midpoint plot from only the ones deemed preferred or both good. Its a small sample, but since it will only use formant values deemed correct, if it shows differences with the full-corpus plots (which may be affected by errors) it might be worth checking more fasttrack values for correctness</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Done. The new plot compares:
+
+1. Full-corpus FastTrack
+2. Raw FastTrack for the representative reviewed tokens
+3. Review-selected values for exactly those same tokens
+4. All usable reviewed tokens, including the diagnostic sample
+
+[View the midpoint comparison](&lt;/data/html/dev/swedia-formants-2026/Analyses/FastTrack_review_400_midpoint_comparison/full_vs_reviewed_formant_pair_midpoints.png&gt;)
+
+The key comparison is panels 2 and 3. Manual selection changes the geometry somewhat, especially `/æː–eː/`, but most midpoint movements are small. The largest shift along a pair axis is 0.09 Bark. Much larger differences between the full corpus and reviewed subset remain even before corrections, showing that sampling uncertainty is substantial.
+
+My assessment: this gives a reason to review more influential FastTrack cases—particularly `/eː/`, `/æː/`, and `/øː/`—but not yet evidence that general FastTrack error explains the full-corpus regional patterns.
+
+Outputs:
+
+- [Analysis script](&lt;/data/html/dev/swedia-formants-2026/plot_reviewed_formant_pair_midpoints.py&gt;)
+- [Plot data](&lt;/data/html/dev/swedia-formants-2026/Analyses/FastTrack_review_400_midpoint_comparison/reviewed_midpoint_comparison.csv&gt;)</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Lets shift focus for a while; I am also toying with the idea of using examples deemed correct to train and evaluate a neural system for formant prediction, probably by fine-tuning an existing wav2vec2 model or similar. Lets investigate this idea right now, but for any major work perhaps its a good idea to handoff this to a new session?</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>The idea is viable, but the present 400-token review is better suited as an evaluation set than as training data.
+
+The main limitation is label quality: “both good” or “preferred” identifies an acceptable algorithmic track, but does not provide independently measured, frame-level F1/F2 ground truth. We have roughly 386 accepted tokens, mostly “both good,” and only nine cases where fixed Praat replaces FastTrack. Fine-tuning wav2vec2 directly on those midpoint values would risk learning the existing trackers’ biases.
+
+A sensible progression would be:
+
+1. Benchmark pretrained neural trackers such as [FormantNet](https://github.com/NemoursResearch/FormantNet) and the [probabilistic heat-map tracker](https://github.com/MLSpeech/FormantsTracker) on the reviewed tokens.
+2. Compare their predictions with the accepted track and, ideally, conduct a small blinded review including the neural output.
+3. If promising, manually correct actual F1/F2 trajectories for perhaps 1,000–3,000 strategically sampled vowels.
+4. Train a small regression or heat-map head on frozen wav2vec2 features first. Full wav2vec2 fine-tuning is probably excessive at this scale.
+5. Evaluate with speakers—and preferably villages—held out entirely. Otherwise the model may exploit speaker or dialect identity, which would be especially dangerous for the geographical analysis.
+
+An attractive intermediate experiment is not direct formant prediction but neural candidate selection: give the model several LPC/FastTrack candidates and train it to select or score them. That constrains predictions to acoustically plausible resonances and requires fewer labels. The current review could contribute, although more cases where methods genuinely differ would be needed.
+
+So yes: worth investigating, but I would begin with an off-the-shelf neural benchmark, not wav2vec2 fine-tuning. Once we start installing models, preparing datasets, and running GPU experiments, a new session with a concise handoff would be cleaner. This session already contains a very long chain of PCA, formant, and geographical work that the neural experiment does not need.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>great, i&#x27;ll check formantnet etc, we&#x27;ll return to this another time. two other things we have ignored so far is 1) diphthongization. some dialect exhibit stronger dynamic vowels than others. we have largely focused on the midpoint for simplicity, but this may have to be adressed one way or another 2) contextual aspects; not all dialects use the same word for a vowel token, and there may be cases where the consonant after the vowel affects the vowel. here choosing the midpoint might actually work in our favour. we also largely avoided post-vocalic /r/, which is known to affect vowel quality quite significantly for some vowels. we need some strategy of adressing this</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Both need addressing, but neither requires abandoning midpoint analysis. I would keep midpoint F1/F2 as the primary, easily interpretable measure and add targeted robustness analyses.
+
+For diphthongization:
+
+- Measure F1/F2 at 20%, 50%, and 80% of each vowel.
+- Derive trajectory magnitude: distance from 20% to 80% in Bark.
+- Derive trajectory direction/bearing and possibly curvature through the midpoint.
+- Compare geographical patterns using both midpoint position and trajectory measures.
+- Plot regional mean trajectories with uncertainty, rather than treating every vowel as stationary.
+
+This separates two potentially independent dialectal properties: where the vowel is centred and how strongly/directionally it moves. Tracking reliability will be worse near vowel edges, so 20–80% is preferable to the literal onset and offset.
+
+For context, construct token-level metadata containing:
+
+- word/lexical target
+- preceding and following segment
+- broad following-place/manner categories
+- post-vocalic `/r/`
+- vowel duration
+- speaker and village
+
+Then quantify imbalance before modelling. A mixed or GAM-style model could estimate geography while controlling for vowel identity, following context, duration, and word, with speaker as a random effect. Word and segment are partly confounded because dialects do not always contribute the same words, so a matched subset is an important robustness check: retain only lexical targets or following-context classes represented across multiple regions.
+
+I would handle `/r/` separately:
+
+- Keep excluding it from the primary analysis.
+- Analyse pre-`/r/` vowels as a dedicated subsystem if token counts permit.
+- Do not simply add `/r/` as a small nuisance covariate, since its effect may differ by vowel and dialect.
+
+A defensible overall strategy is therefore:
+
+1. Primary analysis: non-rhotic contexts, midpoint values, existing eight vowels.
+2. Context-controlled model using all adequately represented consonantal contexts.
+3. Matched-word/context sensitivity analysis.
+4. Separate vowel-trajectory analysis.
+5. Separate pre-rhotic analysis.
+
+This would reveal whether the geographical findings reflect vowel targets, diphthongization, contextual composition, or some combination of them.</pre>
+    </section>
     </section>
   </main>
   <script>

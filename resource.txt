@@ -1,4 +1,5 @@
 set ort_resource {
+	{reference ref Reference Central 185 379 -1}
 	{alvdalen alv Älvdalen Dalarna 105 315 -1}
 	{ankarsrum ank Ankarsrum Småland 149 456 2a}
 	{anundsjo anu Anundsjö Ångermanland 182 230 2a}

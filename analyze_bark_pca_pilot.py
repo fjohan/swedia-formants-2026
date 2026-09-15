@@ -208,6 +208,11 @@ def fit_pca(rows: list[dict], band_fields: list[str]) -> tuple[np.ndarray, np.nd
     mean = matrix.mean(axis=0)
     _, singular, vt = np.linalg.svd(matrix - mean, full_matrices=False)
     components = vt
+    # SVD eigenvector signs are arbitrary. Give every component a reproducible
+    # orientation by making its largest absolute loading positive.
+    for component in components:
+        if component[np.argmax(np.abs(component))] < 0:
+            component *= -1
     variance = singular ** 2 / (len(matrix) - 1)
     ratio = variance / variance.sum()
     return mean, components, ratio, balanced
@@ -254,6 +259,13 @@ def panel_grid(villages: list[str], columns: int = 4):
     return fig, list(axes)
 
 
+def display_xy(row: dict, orientation: str) -> tuple[float, float]:
+    """Map PCA scores to raw or conventional vowel-chart-like display axes."""
+    if orientation == "traditional":
+        return -float(row["pc1"]), -float(row["pc2"])
+    return float(row["pc2"]), float(row["pc1"])
+
+
 def ellipse_metrics(points: np.ndarray) -> dict[str, float]:
     centroid = points.mean(axis=0)
     values, vectors = np.linalg.eigh(np.cov(points - centroid, rowvar=False))
@@ -267,8 +279,9 @@ def ellipse_metrics(points: np.ndarray) -> dict[str, float]:
     minor = math.sqrt(max(float(values[1]), 0.0))
     axis_ratio = major / minor if minor else math.inf
     return {
-        "centroid_pc2": float(centroid[0]), "centroid_pc1": float(centroid[1]),
+        "centroid_x": float(centroid[0]), "centroid_y": float(centroid[1]),
         "ellipse_angle_deg": angle, "ellipse_angle_signed_deg": signed_angle,
+        "ellipse_angle_from_horizontal_signed_deg": signed_angle,
         "ellipse_angle_from_vertical_signed_deg": vertical_angle,
         "major_axis_sd": major, "minor_axis_sd": minor, "axis_ratio": axis_ratio,
         "orientation_reliable": int(axis_ratio >= 1.2),
@@ -284,10 +297,10 @@ def ellipse_outline(metrics: dict[str, float], scale: float = 2.0) -> tuple[np.n
     ])
     rotation = np.array([[math.cos(angle), -math.sin(angle)], [math.sin(angle), math.cos(angle)]])
     rotated = rotation @ points
-    return rotated[0] + metrics["centroid_pc2"], rotated[1] + metrics["centroid_pc1"]
+    return rotated[0] + metrics["centroid_x"], rotated[1] + metrics["centroid_y"]
 
 
-def plot_midpoints(path: Path, rows: list[dict]) -> list[dict]:
+def plot_midpoints(path: Path, rows: list[dict], orientation: str = "raw") -> list[dict]:
     subset = [row for row in rows if math.isclose(row["time_proportion"], 0.5)]
     grouped: dict[tuple, list[dict]] = defaultdict(list)
     for row in subset:
@@ -302,7 +315,8 @@ def plot_midpoints(path: Path, rows: list[dict]) -> list[dict]:
             values = grouped.get((village, target), [])
             if not values:
                 continue
-            x, y = np.mean([r["pc2"] for r in values]), np.mean([r["pc1"] for r in values])
+            coordinates = [display_xy(row, orientation) for row in values]
+            x, y = np.mean([point[0] for point in coordinates]), np.mean([point[1] for point in coordinates])
             positions[target] = (x, y)
             ax.scatter(x, y, color=colors[target], s=38)
             ax.annotate(f"/{VOWEL_IPA[target]}/", (x, y), xytext=(4, 3), textcoords="offset points")
@@ -328,7 +342,10 @@ def plot_midpoints(path: Path, rows: list[dict]) -> list[dict]:
             metrics = ellipse_metrics(np.asarray(points, dtype=float))
             outline_x, outline_y = ellipse_outline(metrics)
             if metrics["orientation_reliable"]:
-                angle_label = f'{metrics["ellipse_angle_from_vertical_signed_deg"]:+.1f}° from vertical'
+                if orientation == "traditional":
+                    angle_label = f'{metrics["ellipse_angle_from_horizontal_signed_deg"]:+.1f}° from horizontal'
+                else:
+                    angle_label = f'{metrics["ellipse_angle_from_vertical_signed_deg"]:+.1f}° from vertical'
             else:
                 angle_label = f'angle unstable (ratio {metrics["axis_ratio"]:.2f})'
             ax.plot(
@@ -342,12 +359,86 @@ def plot_midpoints(path: Path, rows: list[dict]) -> list[dict]:
             ax.legend(loc="best", fontsize=6, framealpha=0.75)
     for ax in axes[len(villages):]:
         ax.set_visible(False)
-    fig.supxlabel("PC2"); fig.supylabel("PC1"); fig.suptitle("Midpoint vowel spaces: village means")
+    if orientation == "traditional":
+        fig.supxlabel("−PC1"); fig.supylabel("−PC2")
+        fig.suptitle("Midpoint vowel spaces: village means (traditional orientation)")
+    else:
+        fig.supxlabel("PC2"); fig.supylabel("PC1"); fig.suptitle("Midpoint vowel spaces: village means")
     fig.tight_layout(rect=(0, 0, 1, 0.985)); fig.savefig(path, dpi=180); plt.close(fig)
     return ellipse_rows
 
 
-def plot_trajectories(path: Path, balanced: list[dict], tokens: list[dict], show_individual: bool) -> None:
+def plot_midpoint_variation(path: Path, rows: list[dict]) -> list[dict]:
+    """Plot speaker-balanced midpoint dispersion for each vowel and village."""
+    subset = [row for row in rows if math.isclose(float(row["time_proportion"]), 0.5)]
+    grouped: dict[tuple[str, str], list[dict]] = defaultdict(list)
+    for row in subset:
+        grouped[(row["village"], row["target_label"])].append(row)
+    colors = dict(zip(VOWEL_ORDER, plt.get_cmap("tab10").colors))
+    villages = sorted({row["village"] for row in subset})
+    fig, axes = panel_grid(villages)
+    # For chi-square(df=2), q(p) = -2 ln(1-p). Scaling the covariance axes by
+    # sqrt(q(.68)) gives an ellipse containing 68% under a bivariate normal.
+    probability_scale = math.sqrt(-2.0 * math.log(1.0 - 0.68))
+    ellipse_rows = []
+    for ax, village in zip(axes, villages):
+        speaker_points: dict[str, dict[str, tuple[float, float]]] = defaultdict(dict)
+        for target in VOWEL_ORDER:
+            values = grouped.get((village, target), [])
+            if not values:
+                continue
+            points = np.asarray([display_xy(row, "traditional") for row in values], dtype=float)
+            for row, point in zip(values, points):
+                speaker_points[row["recording"]][target] = (float(point[0]), float(point[1]))
+            color = colors[target]
+            ax.scatter(points[:, 0], points[:, 1], color=[color], s=15, alpha=0.42,
+                       edgecolors="none", zorder=2)
+            mean = points.mean(axis=0)
+            if len(points) >= 3:
+                metrics = ellipse_metrics(points)
+                outline_x, outline_y = ellipse_outline(metrics, scale=probability_scale)
+                ax.fill(outline_x, outline_y, color=color, alpha=0.10, zorder=1)
+                ax.plot(outline_x, outline_y, color=color, alpha=0.72, lw=1.0, zorder=2)
+            ax.scatter(*mean, color=[color], marker="o", s=35, edgecolors="#222222",
+                       linewidths=0.55, zorder=3)
+            ax.annotate(f"/{VOWEL_IPA[target]}/", mean, xytext=(4, 3),
+                        textcoords="offset points", fontsize=8)
+        complete_speakers = 0
+        for recording, target_points in sorted(speaker_points.items()):
+            if len(target_points) != len(VOWEL_ORDER):
+                continue
+            complete_speakers += 1
+            speaker_space = np.asarray([target_points[target] for target in VOWEL_ORDER], dtype=float)
+            metrics = ellipse_metrics(speaker_space)
+            outline_x, outline_y = ellipse_outline(metrics, scale=2.0)
+            ax.plot(outline_x, outline_y, color="#202020", lw=1.15, alpha=0.55,
+                    ls="--", zorder=4)
+            ellipse_rows.append({
+                "village": village, "recording": recording,
+                "fit_basis": "individual_speaker_vowels", "n_points": len(speaker_space), **metrics,
+            })
+        if complete_speakers:
+            ax.plot([], [], color="#202020", lw=1.15, alpha=0.65, ls="--",
+                    label=f"individual 2-SD vowel-space ellipses (n={complete_speakers})")
+            ax.legend(loc="best", fontsize=6, framealpha=0.78)
+        ax.set_title(village.capitalize())
+        ax.grid(alpha=0.2)
+        ax.set_aspect("equal", adjustable="box")
+    for ax in axes[len(villages):]:
+        ax.set_visible(False)
+    fig.supxlabel("−PC1")
+    fig.supylabel("−PC2")
+    fig.suptitle("Midpoint variation: per-vowel 68% ellipses and individual-speaker vowel spaces")
+    fig.tight_layout(rect=(0, 0, 1, 0.985))
+    fig.savefig(path, dpi=180)
+    plt.close(fig)
+    return ellipse_rows
+
+
+def plot_trajectories(
+    path: Path, balanced: list[dict], tokens: list[dict], show_individual: bool,
+    orientation: str = "raw",
+) -> None:
     grouped: dict[tuple, list[dict]] = defaultdict(list)
     for row in balanced:
         grouped[(row["village"], row["target_label"])].append(row)
@@ -362,15 +453,20 @@ def plot_trajectories(path: Path, balanced: list[dict], tokens: list[dict], show
                     token_groups[(row["target_label"], row["token_id"])].append(row)
             for (target, _), token_rows in token_groups.items():
                 token_rows.sort(key=lambda row: row["time_proportion"])
+                coordinates = [display_xy(row, orientation) for row in token_rows]
                 ax.plot(
-                    [row["pc2"] for row in token_rows], [row["pc1"] for row in token_rows],
+                    [point[0] for point in coordinates], [point[1] for point in coordinates],
                     color=colors[target], alpha=0.13, lw=0.7, zorder=1,
                 )
         for target in VOWEL_ORDER:
             by_time: dict[float, list[dict]] = defaultdict(list)
             for row in grouped.get((village, target), []):
                 by_time[row["time_proportion"]].append(row)
-            points = [(t, np.mean([r["pc2"] for r in rs]), np.mean([r["pc1"] for r in rs])) for t, rs in sorted(by_time.items())]
+            points = []
+            for time, time_rows in sorted(by_time.items()):
+                coordinates = [display_xy(row, orientation) for row in time_rows]
+                points.append((time, np.mean([point[0] for point in coordinates]),
+                               np.mean([point[1] for point in coordinates])))
             if not points:
                 continue
             x, y = np.array([p[1] for p in points]), np.array([p[2] for p in points])
@@ -381,7 +477,12 @@ def plot_trajectories(path: Path, balanced: list[dict], tokens: list[dict], show
         ax.set_title(village.capitalize()); ax.grid(alpha=0.2)
     for ax in axes[len(villages):]:
         ax.set_visible(False)
-    fig.supxlabel("PC2"); fig.supylabel("PC1"); fig.suptitle("Mean spectral trajectories (10% → 90%)")
+    if orientation == "traditional":
+        fig.supxlabel("−PC1"); fig.supylabel("−PC2")
+        fig.suptitle("Mean spectral trajectories (10% → 90%, traditional orientation)")
+    else:
+        fig.supxlabel("PC2"); fig.supylabel("PC1")
+        fig.suptitle("Mean spectral trajectories (10% → 90%)")
     fig.tight_layout(rect=(0, 0, 1, 0.985)); fig.savefig(path, dpi=180); plt.close(fig)
 
 
@@ -389,8 +490,9 @@ def plot_speakers(output: Path, balanced: list[dict], tokens: list[dict]) -> Non
     """Plot globally projected token and mean trajectories for each speaker."""
     output.mkdir(parents=True, exist_ok=True)
     colors = dict(zip(VOWEL_ORDER, plt.get_cmap("tab10").colors))
-    all_x = np.array([row["pc2"] for row in tokens])
-    all_y = np.array([row["pc1"] for row in tokens])
+    all_coordinates = [display_xy(row, "traditional") for row in tokens]
+    all_x = np.array([point[0] for point in all_coordinates])
+    all_y = np.array([point[1] for point in all_coordinates])
     x_pad = max(2.0, 0.04 * np.ptp(all_x))
     y_pad = max(2.0, 0.04 * np.ptp(all_y))
     xlim = (all_x.min() - x_pad, all_x.max() + x_pad)
@@ -405,8 +507,9 @@ def plot_speakers(output: Path, balanced: list[dict], tokens: list[dict]) -> Non
             token_groups[(row["target_label"], row["token_id"])].append(row)
         for (target, _), token_rows in token_groups.items():
             token_rows.sort(key=lambda row: row["time_proportion"])
+            coordinates = [display_xy(row, "traditional") for row in token_rows]
             ax.plot(
-                [row["pc2"] for row in token_rows], [row["pc1"] for row in token_rows],
+                [point[0] for point in coordinates], [point[1] for point in coordinates],
                 color=colors[target], alpha=0.18, lw=0.8, zorder=1,
             )
         for target in VOWEL_ORDER:
@@ -416,8 +519,9 @@ def plot_speakers(output: Path, balanced: list[dict], tokens: list[dict]) -> Non
             )
             if not mean_rows:
                 continue
-            x = np.array([row["pc2"] for row in mean_rows])
-            y = np.array([row["pc1"] for row in mean_rows])
+            coordinates = [display_xy(row, "traditional") for row in mean_rows]
+            x = np.array([point[0] for point in coordinates])
+            y = np.array([point[1] for point in coordinates])
             ax.plot(x, y, "o-", color=colors[target], lw=3.0, ms=5, zorder=3)
             ax.annotate(
                 f"/{VOWEL_IPA[target]}/", (x[-1], y[-1]), xytext=(4, 3),
@@ -433,7 +537,7 @@ def plot_speakers(output: Path, balanced: list[dict], tokens: list[dict]) -> Non
         )]
         subtitle = f"Missing: {', '.join(missing)}" if missing else "All eight vowel categories present"
         ax.set(
-            xlim=xlim, ylim=ylim, xlabel="PC2", ylabel="PC1",
+            xlim=xlim, ylim=ylim, xlabel="−PC1", ylabel="−PC2",
             title=f"{recording}: token and mean trajectories\n{subtitle}",
         )
         ax.grid(alpha=0.2)
@@ -505,10 +609,24 @@ def main() -> int:
     ])
     plot_scree(args.output / "scree.png", ratio)
     plot_loadings(args.output / "loadings.png", centers, components)
-    ellipse_rows = plot_midpoints(args.output / "midpoint_vowel_spaces.png", balanced)
+    ellipse_rows = plot_midpoints(
+        args.output / "midpoint_vowel_spaces.png", balanced, orientation="traditional"
+    )
     write_csv(args.output / "village_pca_ellipses.csv", ellipse_rows)
+    plot_midpoints(
+        args.output / "midpoint_vowel_spaces_raw.png", balanced, orientation="raw"
+    )
+    speaker_ellipse_rows = plot_midpoint_variation(
+        args.output / "midpoint_vowel_variation.png", balanced
+    )
+    write_csv(args.output / "speaker_pca_ellipses.csv", speaker_ellipse_rows)
     plot_trajectories(
-        args.output / "vowel_trajectories.png", balanced, rows, args.individual_trajectories
+        args.output / "vowel_trajectories.png", balanced, rows,
+        args.individual_trajectories, orientation="traditional",
+    )
+    plot_trajectories(
+        args.output / "vowel_trajectories_raw.png", balanced, rows,
+        args.individual_trajectories, orientation="raw",
     )
     if args.speaker_plots:
         plot_speakers(args.output / "speakers", balanced, rows)
