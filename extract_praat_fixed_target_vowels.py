@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import csv
 import math
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -112,6 +113,10 @@ def main() -> int:
         help="Require the surface segment label to equal the base target label.",
     )
     parser.add_argument("--limit-recordings", type=int, default=0, help="Testing only; zero means all.")
+    parser.add_argument(
+        "--recordings", nargs="+",
+        help="Analyze only these recording stems (useful for diagnosis or small runs).",
+    )
     args = parser.parse_args()
 
     CandidateTracks = None
@@ -133,6 +138,12 @@ def main() -> int:
     expected = {target["target"]: target["seg"] for target in BASE_TARGETS}
     coordinates = read_coordinates(args.resource)
     recordings = discover_recordings(args.textgrids, args.media_dirs)
+    if args.recordings:
+        requested = set(args.recordings)
+        missing = requested - set(recordings)
+        if missing:
+            raise SystemExit(f"Unknown or unavailable recordings: {', '.join(sorted(missing))}")
+        recordings = [stem for stem in recordings if stem in requested]
     if args.limit_recordings:
         recordings = recordings[: args.limit_recordings]
 
@@ -236,16 +247,24 @@ def main() -> int:
                         row[f"_pca_{percentage}"] = np.median(np.asarray(spectra), axis=0)
                 if args.fasttrack:
                     try:
-                        candidates = CandidateTracks(
-                            sound=clip,
-                            min_max_formant=args.fasttrack_min_ceiling,
-                            max_max_formant=args.fasttrack_max_ceiling,
-                            nstep=args.fasttrack_steps,
-                            n_formants=4,
-                            window_length=args.window_length,
-                            time_step=args.time_step,
-                            pre_emphasis_from=args.pre_emphasis,
-                        )
+                        with warnings.catch_warnings(record=True) as caught_warnings:
+                            warnings.simplefilter("always")
+                            candidates = CandidateTracks(
+                                sound=clip,
+                                min_max_formant=args.fasttrack_min_ceiling,
+                                max_max_formant=args.fasttrack_max_ceiling,
+                                nstep=args.fasttrack_steps,
+                                n_formants=4,
+                                window_length=args.window_length,
+                                time_step=args.time_step,
+                                pre_emphasis_from=args.pre_emphasis,
+                            )
+                        for warning in caught_warnings:
+                            print(
+                                f"  FastTrack WARNING {stem} {word} "
+                                f"[{start:.3f}-{end:.3f}s]: {warning.message}",
+                                flush=True,
+                            )
                         winner = candidates.winner
                         track_times = np.asarray(winner.time_domain, dtype=float)
                         track_f1 = np.asarray(winner.smoothed_formants[0], dtype=float)
