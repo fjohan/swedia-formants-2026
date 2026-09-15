@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import math
 from pathlib import Path
 
 import numpy as np
@@ -20,7 +21,11 @@ from inventory_base_word_targets import (
 from plot_pca_angle_maps import RESOURCE_ALIASES, read_coordinates
 
 
-FIELDS = ("village", "speaker", "vowel", "word", "f1", "f2", "x", "y", "complete")
+FIELDS = (
+    "village", "speaker", "vowel", "word",
+    "f1_20", "f2_20", "f1_50", "f2_50", "f1_80", "f2_80", "VL",
+    "x", "y", "complete",
+)
 
 
 def canonical_ipa(target: str) -> str:
@@ -39,6 +44,12 @@ def recording_parts(stem: str) -> tuple[str, str]:
     return village, f"ym_{number.split('_', 1)[0]}"
 
 
+def finite_median(values: list[float | None]) -> float | None:
+    finite = np.asarray([value for value in values if value is not None], dtype=float)
+    finite = finite[np.isfinite(finite)]
+    return float(np.median(finite)) if len(finite) else None
+
+
 def discover_recordings(textgrid_dir: Path, media_dirs: list[Path]) -> list[str]:
     annotated = {path.stem for path in textgrid_dir.glob("*.TextGrid")}
     audio = {
@@ -48,12 +59,6 @@ def discover_recordings(textgrid_dir: Path, media_dirs: list[Path]) -> list[str]
         for path in directory.glob("*.wav")
     }
     return sorted(stem for stem in annotated & audio if "_ym_" in stem)
-
-
-def finite_median(values: list[float | None]) -> float | None:
-    finite = np.asarray([value for value in values if value is not None], dtype=float)
-    finite = finite[np.isfinite(finite)]
-    return float(np.median(finite)) if len(finite) else None
 
 
 def main() -> int:
@@ -132,19 +137,39 @@ def main() -> int:
                     window_length=args.window_length,
                     pre_emphasis_from=args.pre_emphasis,
                 )
-                times = np.linspace(start + 0.45 * (end - start), start + 0.55 * (end - start), 11)
-                f1 = finite_median([formant.get_value_at_time(1, time) for time in times])
-                f2 = finite_median([formant.get_value_at_time(2, time) for time in times])
-                if f1 is None or f2 is None:
+                measurement_times = {
+                    percentage: np.linspace(
+                        start + (proportion - 0.05) * (end - start),
+                        start + (proportion + 0.05) * (end - start),
+                        11,
+                    )
+                    for percentage, proportion in ((20, 0.20), (50, 0.50), (80, 0.80))
+                }
+                values = {
+                    (formant_number, percentage): finite_median([
+                        formant.get_value_at_time(formant_number, time) for time in times
+                    ])
+                    for percentage, times in measurement_times.items()
+                    for formant_number in (1, 2)
+                }
+                if any(value is None or not np.isfinite(value) for value in values.values()):
                     failed_formants += 1
                     continue
+                f1_20, f2_20 = values[1, 20], values[2, 20]
+                f1_50, f2_50 = values[1, 50], values[2, 50]
+                f1_80, f2_80 = values[1, 80], values[2, 80]
                 rows.append({
                     "village": village,
                     "speaker": speaker,
                     "vowel": canonical_ipa(vowel),
                     "word": word,
-                    "f1": round(f1),
-                    "f2": round(f2),
+                    "f1_20": round(f1_20),
+                    "f2_20": round(f2_20),
+                    "f1_50": round(f1_50),
+                    "f2_50": round(f2_50),
+                    "f1_80": round(f1_80),
+                    "f2_80": round(f2_80),
+                    "VL": round(math.hypot(f1_80 - f1_20, f2_80 - f2_20)),
                     "x": x,
                     "y": y,
                 })
