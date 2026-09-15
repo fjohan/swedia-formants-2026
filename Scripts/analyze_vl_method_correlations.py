@@ -86,7 +86,8 @@ def write_csv(path: Path, rows: list[dict]) -> None:
         writer.writerows(rows)
 
 
-def plot_pairwise(path: Path, rows: list[dict], statistics: list[dict], percentile: float) -> None:
+def plot_pairwise(path: Path, rows: list[dict], statistics: list[dict], percentile: float,
+                  bark: bool) -> None:
     pairs = list(combinations(METHODS, 2))
     fig, axes = plt.subplots(1, 3, figsize=(16.5, 5.2))
     for ax, (first_name, second_name) in zip(axes, pairs):
@@ -111,9 +112,10 @@ def plot_pairwise(path: Path, rows: list[dict], statistics: list[dict], percenti
             transform=ax.transAxes, va="top", ha="left",
             bbox={"facecolor": "white", "alpha": 0.88, "edgecolor": "#bbbbbb"},
         )
+        formant_unit = "Bark" if bark else "Hz"
         ax.set(
-            xlabel=f"{first_name} VL" + (" (Hz)" if first_name != "Spectral PCA" else " (PC-score dB)"),
-            ylabel=f"{second_name} VL" + (" (Hz)" if second_name != "Spectral PCA" else " (PC-score dB)"),
+            xlabel=f"{first_name} VL" + (f" ({formant_unit})" if first_name != "Spectral PCA" else " (PC-score dB)"),
+            ylabel=f"{second_name} VL" + (f" ({formant_unit})" if second_name != "Spectral PCA" else " (PC-score dB)"),
             xlim=(0, x_limit), ylim=(0, y_limit),
         )
         ax.grid(alpha=0.15)
@@ -132,7 +134,11 @@ def main() -> int:
     parser.add_argument("--input", type=Path, default=Path("formants-all.csv"))
     parser.add_argument(
         "--output-dir", type=Path,
-        default=Path("Analyses/VL_method_correlations"),
+        help="Default: Analyses/VL_method_correlations[_bark].",
+    )
+    parser.add_argument(
+        "--bark", action="store_true",
+        help="Use bark_VL and ft_bark_VL instead of the Hz formant vector lengths.",
     )
     parser.add_argument("--complete-only", action="store_true")
     parser.add_argument(
@@ -142,6 +148,12 @@ def main() -> int:
     args = parser.parse_args()
     if not 90 <= args.plot_percentile <= 100:
         parser.error("--plot-percentile must be between 90 and 100")
+    if args.bark:
+        METHODS["Praat fixed"] = "bark_VL"
+        METHODS["FastTrack"] = "ft_bark_VL"
+    if args.output_dir is None:
+        suffix = "_bark" if args.bark else ""
+        args.output_dir = Path(f"Analyses/VL_method_correlations{suffix}")
 
     rows = read_rows(args.input, args.complete_only)
     pairs = list(combinations(METHODS, 2))
@@ -154,7 +166,7 @@ def main() -> int:
     write_csv(args.output_dir / "vl_method_correlations.csv", statistics)
     plot_pairwise(
         args.output_dir / "vl_method_correlations.png",
-        rows, statistics, args.plot_percentile,
+        rows, statistics, args.plot_percentile, args.bark,
     )
     for row in statistics[:3]:
         print(

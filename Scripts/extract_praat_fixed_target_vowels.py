@@ -6,11 +6,17 @@ from __future__ import annotations
 import argparse
 import csv
 import math
+import sys
 import warnings
 from pathlib import Path
 
 import numpy as np
 import parselmouth
+
+ROOT = Path(__file__).resolve().parent.parent
+MORE_SCRIPTS = ROOT / "MoreScripts"
+if str(MORE_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(MORE_SCRIPTS))
 
 from analyze_bark_pca_pilot import (
     VOWEL_IPA,
@@ -38,6 +44,16 @@ FASTTRACK_FIELDS = (
     "ft_f1_20", "ft_f2_20",
     "ft_f1_50", "ft_f2_50",
     "ft_f1_80", "ft_f2_80", "ft_VL",
+)
+BARK_FIELDS = (
+    "bark_f1_20", "bark_f2_20",
+    "bark_f1_50", "bark_f2_50",
+    "bark_f1_80", "bark_f2_80", "bark_VL",
+)
+FASTTRACK_BARK_FIELDS = (
+    "ft_bark_f1_20", "ft_bark_f2_20",
+    "ft_bark_f1_50", "ft_bark_f2_50",
+    "ft_bark_f1_80", "ft_bark_f2_80", "ft_bark_VL",
 )
 PCA_FIELDS = (
     "pca_pc1_20", "pca_pc2_20",
@@ -68,6 +84,27 @@ def finite_median(values: list[float | None]) -> float | None:
     return float(np.median(finite)) if len(finite) else None
 
 
+def hz_to_bark(hz: float) -> float:
+    """Convert Hz using the Traunmüller transform used by this project."""
+    return 26.81 / (1.0 + 1960.0 / hz) - 0.53
+
+
+def bark_measurements(prefix: str, values: dict[tuple[int, int], float]) -> dict[str, float]:
+    transformed = {
+        key: hz_to_bark(value) for key, value in values.items()
+    }
+    result = {
+        f"{prefix}bark_f{formant}_{percentage}": transformed[formant, percentage]
+        for percentage in (20, 50, 80)
+        for formant in (1, 2)
+    }
+    result[f"{prefix}bark_VL"] = math.hypot(
+        transformed[1, 80] - transformed[1, 20],
+        transformed[2, 80] - transformed[2, 20],
+    )
+    return result
+
+
 def discover_recordings(textgrid_dir: Path, media_dirs: list[Path]) -> list[str]:
     annotated = {path.stem for path in textgrid_dir.glob("*.TextGrid")}
     audio = {
@@ -92,6 +129,10 @@ def main() -> int:
     parser.add_argument("--window-length", type=float, default=0.025)
     parser.add_argument("--time-step", type=float, default=0.002)
     parser.add_argument("--pre-emphasis", type=float, default=50.0)
+    parser.add_argument(
+        "--bark", action="store_true",
+        help="Add Bark F1/F2 and Bark-space VL for Praat and, if requested, FastTrack.",
+    )
     parser.add_argument(
         "--fasttrack", action="store_true",
         help="Add robust FastTrackPy measurements at the same time points.",
@@ -235,6 +276,8 @@ def main() -> int:
                     "geo_x": x,
                     "geo_y": y,
                 }
+                if args.bark:
+                    row.update(bark_measurements("", values))
                 if args.pca:
                     for percentage, times in measurement_times.items():
                         spectra = [
@@ -293,6 +336,8 @@ def main() -> int:
                                 ft_f1_80 - ft_f1_20, ft_f2_80 - ft_f2_20
                             )),
                         })
+                        if args.bark:
+                            row.update(bark_measurements("ft_", fasttrack_values))
                     except Exception as error:
                         failed_fasttrack += 1
                         print(f"  FastTrack ERROR {stem} {word}: {type(error).__name__}: {error}", flush=True)
@@ -337,7 +382,9 @@ def main() -> int:
             handle,
             fieldnames=(
                 FIELDS
+                + (BARK_FIELDS if args.bark else ())
                 + (FASTTRACK_FIELDS if args.fasttrack else ())
+                + (FASTTRACK_BARK_FIELDS if args.fasttrack and args.bark else ())
                 + (PCA_FIELDS if args.pca else ())
             ),
         )

@@ -8,6 +8,10 @@ Audio recordings are stored in `Media/` and `sounds/`, annotations in `TextGrids
 
 `Scripts/extract_praat_fixed_target_vowels.py` extracts token-level measurements for the eight target vowels. It measures F1 and F2 at robust 20%, 50%, and 80% temporal points using fixed-ceiling Praat analysis and calculates vowel vector length (VL). Optional modes add corresponding FastTrack and Bark-spectrum PCA measurements. The resulting table also contains lexical, speaker, and geographic metadata.
 
+### Adding Bark measurements
+
+`Scripts/add_bark_to_formants.py` provides a fast way to add Bark-transformed F1/F2 values to an existing extraction table. It recalculates Bark-space VL from the transformed 20% and 80% coordinates for both fixed Praat and FastTrack, while preserving the original Hz and PCA measurements.
+
 ## Comparing vowel vector lengths
 
 `Scripts/analyze_vl_method_correlations.py` compares VL estimates from fixed Praat, FastTrack, and spectral PCA. It calculates Pearson and Spearman correlations overall and separately by vowel, and produces pairwise correlation plots and a CSV summary. By default, it reads `formants-all.csv`.

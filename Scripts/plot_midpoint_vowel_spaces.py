@@ -35,10 +35,18 @@ def finite_median(values) -> float:
     return float(np.median(values)) if len(values) else math.nan
 
 
-def read_tokens(path: Path, method: str, include_incomplete: bool) -> list[dict]:
+def method_columns(method: str, bark: bool) -> tuple[str, str]:
+    if bark and method == "praat-fixed":
+        return "bark_f2_50", "bark_f1_50"
+    if bark and method == "fasttrack":
+        return "ft_bark_f2_50", "ft_bark_f1_50"
+    return METHOD_COLUMNS[method]
+
+
+def read_tokens(path: Path, method: str, include_incomplete: bool, bark: bool) -> list[dict]:
     with path.open(encoding="utf-8", newline="") as handle:
         rows = list(csv.DictReader(handle))
-    x_column, y_column = METHOD_COLUMNS[method]
+    x_column, y_column = method_columns(method, bark)
     required = {"village", "speaker", "vowel", "geo_x", "geo_y", x_column, y_column}
     if not include_incomplete:
         required.add("complete")
@@ -231,7 +239,7 @@ def draw_group(ax, values: list[dict], metrics: dict[tuple, dict], method: str, 
 
 
 def make_plots(output: Path, rows: list[dict], angle_rows: list[dict], method: str,
-               grouping: str, groups_per_page: int) -> None:
+               grouping: str, groups_per_page: int, bark: bool) -> None:
     grouped = defaultdict(list)
     for row in rows:
         grouped[group_key(row, grouping)].append(row)
@@ -250,7 +258,8 @@ def make_plots(output: Path, rows: list[dict], angle_rows: list[dict], method: s
         if method == "pca":
             xlabel, ylabel = "−PC1 (score dB)", "−PC2 (score dB)"
         else:
-            xlabel, ylabel = "−F2 (Hz)", "−F1 (Hz)"
+            unit = "Bark" if bark else "Hz"
+            xlabel, ylabel = f"−F2 ({unit})", f"−F1 ({unit})"
         fig.supxlabel(xlabel); fig.supylabel(ylabel)
         fig.suptitle(f"Midpoint vowel spaces: {method}, grouped by {grouping}")
         fig.tight_layout(rect=(0, 0, 1, .985))
@@ -263,6 +272,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", type=Path, default=Path("formants-all.csv"))
     parser.add_argument("--method", choices=tuple(METHOD_COLUMNS), default="praat-fixed")
+    parser.add_argument(
+        "--bark", action="store_true",
+        help="Use Bark F1/F2 for Praat or FastTrack; PCA is unchanged.",
+    )
     parser.add_argument("--group-by", choices=("village", "speaker"), default="village")
     parser.add_argument("--include-incomplete", action="store_true")
     parser.add_argument("--plot", action="store_true")
@@ -271,12 +284,13 @@ def main() -> int:
     args = parser.parse_args()
     if args.groups_per_page < 1:
         parser.error("--groups-per-page must be positive")
+    space_suffix = "_bark" if args.bark and args.method != "pca" else ""
     output = args.output_dir or Path(
-        f"Analyses/Midpoint_vowel_spaces_{args.method}_{args.group_by}"
+        f"Analyses/Midpoint_vowel_spaces_{args.method}{space_suffix}_{args.group_by}"
     )
     output.mkdir(parents=True, exist_ok=True)
 
-    tokens = read_tokens(args.input, args.method, args.include_incomplete)
+    tokens = read_tokens(args.input, args.method, args.include_incomplete, args.bark)
     speaker_rows = speaker_vowels(tokens)
     positions = aggregate(speaker_rows, args.group_by)
     midpoints, angles = analyze(positions, args.method, args.group_by)
@@ -284,7 +298,10 @@ def main() -> int:
     write_csv(output / "pair_midpoints.csv", midpoints)
     write_csv(output / "ellipse_angles.csv", angles)
     if args.plot:
-        make_plots(output, positions, angles, args.method, args.group_by, args.groups_per_page)
+        make_plots(
+            output, positions, angles, args.method, args.group_by,
+            args.groups_per_page, args.bark,
+        )
     print(
         f"{args.method}: {len(tokens)} tokens, {len(positions)} group-vowel positions, "
         f"{len(angles)} ellipse rows; wrote {output}"
