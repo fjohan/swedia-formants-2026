@@ -1,7 +1,7 @@
 {
   "input": "formants-all.csv",
-  "method": "fasttrack",
-  "space": "bark",
+  "method": "pca",
+  "space": "pca",
   "grouping": "equal",
   "group_order": [
     "North",
