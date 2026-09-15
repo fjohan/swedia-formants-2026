@@ -19,3 +19,15 @@ Audio recordings are stored in `Media/` and `sounds/`, annotations in `TextGrids
 ## Plotting midpoint vowel spaces
 
 `Scripts/plot_midpoint_vowel_spaces.py` constructs midpoint vowel spaces from fixed Praat, FastTrack, or PCA measurements. It can aggregate by village or speaker, optionally include incomplete speakers, and plot vowel positions, directed vowel-pair arrows, pair midpoints, and fitted ellipses. It also exports ellipse angles and geographic coordinates for subsequent spatial analyses.
+
+## Relating ellipse angles to geography
+
+`Scripts/analyze_north_south_vs_angle.py` relates vowel-space and midpoint-ellipse angles to geographic north–south position. It produces angle maps, correlation plots, Pearson and Spearman statistics, and village-permutation tests, with clustered treatment of speaker-level observations.
+
+## Analysing directed vowel pairs
+
+`Scripts/analyze_vowel_pair_geography.py` measures changes along the axis of each directed vowel pair. It separates movement of the two endpoints, movement of the pair midpoint, and expansion or compression of the pair, and models their potentially nonlinear relationship with north–south position.
+
+## Summarizing regional pair midpoints
+
+`Scripts/plot_regional_pair_midpoint_summary.py` provides a compact regional view of vowel-pair midpoints. Speakers can be divided into approximately equal north, central, and south groups or into Norrland, Svealand, and Götaland. Arrows identify pairs with a monotonic ordering across the three groups.
