@@ -11,7 +11,15 @@ from pathlib import Path
 import numpy as np
 import parselmouth
 
-from analyze_bark_pca_pilot import VOWEL_IPA, find_vowel_segment, lexical_targets, locate_recording
+from analyze_bark_pca_pilot import (
+    VOWEL_IPA,
+    bark_filterbank,
+    find_vowel_segment,
+    lexical_targets,
+    locate_recording,
+    read_wav,
+    spectral_vector,
+)
 from inventory_base_word_targets import (
     BASE_TARGETS,
     normalized_word,
@@ -22,9 +30,18 @@ from plot_pca_angle_maps import RESOURCE_ALIASES, read_coordinates
 
 
 FIELDS = (
-    "village", "speaker", "vowel", "word",
+    "village", "speaker", "vowel", "word", "geo_x", "geo_y", "complete",
     "f1_20", "f2_20", "f1_50", "f2_50", "f1_80", "f2_80", "VL",
-    "x", "y", "complete",
+)
+FASTTRACK_FIELDS = (
+    "ft_f1_20", "ft_f2_20",
+    "ft_f1_50", "ft_f2_50",
+    "ft_f1_80", "ft_f2_80", "ft_VL",
+)
+PCA_FIELDS = (
+    "pca_pc1_20", "pca_pc2_20",
+    "pca_pc1_50", "pca_pc2_50",
+    "pca_pc1_80", "pca_pc2_80", "pca_VL",
 )
 
 
@@ -75,11 +92,42 @@ def main() -> int:
     parser.add_argument("--time-step", type=float, default=0.002)
     parser.add_argument("--pre-emphasis", type=float, default=50.0)
     parser.add_argument(
+        "--fasttrack", action="store_true",
+        help="Add robust FastTrackPy measurements at the same time points.",
+    )
+    parser.add_argument("--fasttrack-min-ceiling", type=float, default=4000.0)
+    parser.add_argument("--fasttrack-max-ceiling", type=float, default=7000.0)
+    parser.add_argument("--fasttrack-steps", type=int, default=20)
+    parser.add_argument(
+        "--pca", action="store_true",
+        help="Fit a global speaker-vowel-balanced spectral PCA and add PC1/PC2 trajectories.",
+    )
+    parser.add_argument("--pca-sample-rate", type=int, default=16000)
+    parser.add_argument("--pca-window-ms", type=float, default=25.0)
+    parser.add_argument("--pca-n-fft", type=int, default=1024)
+    parser.add_argument("--pca-bands", type=int, default=20)
+    parser.add_argument("--pca-max-bark", type=float, default=21.0)
+    parser.add_argument(
         "--strict-seg-label", action="store_true",
         help="Require the surface segment label to equal the base target label.",
     )
     parser.add_argument("--limit-recordings", type=int, default=0, help="Testing only; zero means all.")
     args = parser.parse_args()
+
+    CandidateTracks = None
+    if args.fasttrack:
+        try:
+            from fasttrackpy import CandidateTracks
+        except ImportError as error:
+            raise SystemExit(
+                "FastTrackPy is unavailable in this interpreter. Run with "
+                "fasttrackpy/bin/python (the repository directory named "
+                "'fasttrackpy' shadows the package in swedia-pca)."
+            ) from error
+    pca_filters = None
+    if args.pca:
+        frequencies = np.fft.rfftfreq(args.pca_n_fft, 1.0 / args.pca_sample_rate)
+        _, pca_filters = bark_filterbank(frequencies, args.pca_bands, args.pca_max_bark)
 
     mapping = lexical_targets()
     expected = {target["target"]: target["seg"] for target in BASE_TARGETS}
@@ -89,7 +137,7 @@ def main() -> int:
         recordings = recordings[: args.limit_recordings]
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    written = skipped_annotations = failed_formants = 0
+    written = skipped_annotations = failed_formants = failed_fasttrack = 0
     missing_coordinates: set[str] = set()
 
     rows: list[dict] = []
@@ -100,7 +148,10 @@ def main() -> int:
                 missing_coordinates.add(village)
                 continue
             x, y, _ = coordinates[resource_key]
-            sound = parselmouth.Sound(str(locate_recording(stem, args.media_dirs)))
+            wav_path = locate_recording(stem, args.media_dirs)
+            sound = parselmouth.Sound(str(wav_path))
+            if args.pca:
+                pca_rate, pca_samples = read_wav(wav_path, args.pca_sample_rate)
             textgrid = args.textgrids / f"{stem}.TextGrid"
             words = parse_textgrid_tier(textgrid, "ord")
             segments = parse_textgrid_tier(textgrid, "seg")
@@ -158,7 +209,7 @@ def main() -> int:
                 f1_20, f2_20 = values[1, 20], values[2, 20]
                 f1_50, f2_50 = values[1, 50], values[2, 50]
                 f1_80, f2_80 = values[1, 80], values[2, 80]
-                rows.append({
+                row = {
                     "village": village,
                     "speaker": speaker,
                     "vowel": canonical_ipa(vowel),
@@ -170,9 +221,63 @@ def main() -> int:
                     "f1_80": round(f1_80),
                     "f2_80": round(f2_80),
                     "VL": round(math.hypot(f1_80 - f1_20, f2_80 - f2_20)),
-                    "x": x,
-                    "y": y,
-                })
+                    "geo_x": x,
+                    "geo_y": y,
+                }
+                if args.pca:
+                    for percentage, times in measurement_times.items():
+                        spectra = [
+                            spectral_vector(
+                                pca_samples, pca_rate, float(time), args.pca_window_ms,
+                                args.pca_n_fft, pca_filters,
+                            )[0]
+                            for time in times
+                        ]
+                        row[f"_pca_{percentage}"] = np.median(np.asarray(spectra), axis=0)
+                if args.fasttrack:
+                    try:
+                        candidates = CandidateTracks(
+                            sound=clip,
+                            min_max_formant=args.fasttrack_min_ceiling,
+                            max_max_formant=args.fasttrack_max_ceiling,
+                            nstep=args.fasttrack_steps,
+                            n_formants=4,
+                            window_length=args.window_length,
+                            time_step=args.time_step,
+                            pre_emphasis_from=args.pre_emphasis,
+                        )
+                        winner = candidates.winner
+                        track_times = np.asarray(winner.time_domain, dtype=float)
+                        track_f1 = np.asarray(winner.smoothed_formants[0], dtype=float)
+                        track_f2 = np.asarray(winner.smoothed_formants[1], dtype=float)
+                        fasttrack_values = {}
+                        for percentage, times in measurement_times.items():
+                            fasttrack_values[1, percentage] = finite_median(
+                                np.interp(times, track_times, track_f1).tolist()
+                            )
+                            fasttrack_values[2, percentage] = finite_median(
+                                np.interp(times, track_times, track_f2).tolist()
+                            )
+                        if any(value is None for value in fasttrack_values.values()):
+                            raise ValueError("FastTrack produced no finite measurement")
+                        ft_f1_20, ft_f2_20 = fasttrack_values[1, 20], fasttrack_values[2, 20]
+                        ft_f1_50, ft_f2_50 = fasttrack_values[1, 50], fasttrack_values[2, 50]
+                        ft_f1_80, ft_f2_80 = fasttrack_values[1, 80], fasttrack_values[2, 80]
+                        row.update({
+                            "ft_f1_20": round(ft_f1_20),
+                            "ft_f2_20": round(ft_f2_20),
+                            "ft_f1_50": round(ft_f1_50),
+                            "ft_f2_50": round(ft_f2_50),
+                            "ft_f1_80": round(ft_f1_80),
+                            "ft_f2_80": round(ft_f2_80),
+                            "ft_VL": round(math.hypot(
+                                ft_f1_80 - ft_f1_20, ft_f2_80 - ft_f2_20
+                            )),
+                        })
+                    except Exception as error:
+                        failed_fasttrack += 1
+                        print(f"  FastTrack ERROR {stem} {word}: {type(error).__name__}: {error}", flush=True)
+                rows.append(row)
                 written += 1
             print(f"[{index}/{len(recordings)}] {stem}", flush=True)
 
@@ -184,13 +289,45 @@ def main() -> int:
     all_vowels = {canonical_ipa(target) for target in VOWEL_IPA}
     for row in rows:
         row["complete"] = int(speaker_vowels[(row["village"], row["speaker"])] == all_vowels)
+    if args.pca:
+        # Equalize lexical-token imbalance before fitting: every
+        # speaker-vowel-time cell contributes one mean spectrum.
+        balanced: dict[tuple[str, str, str, int], list[np.ndarray]] = {}
+        for row in rows:
+            for percentage in (20, 50, 80):
+                key = (row["village"], row["speaker"], row["vowel"], percentage)
+                balanced.setdefault(key, []).append(row[f"_pca_{percentage}"])
+        matrix = np.asarray([
+            np.mean(vectors, axis=0) for _, vectors in sorted(balanced.items())
+        ])
+        pca_mean = matrix.mean(axis=0)
+        _, _, components = np.linalg.svd(matrix - pca_mean, full_matrices=False)
+        for component in components:
+            if component[np.argmax(np.abs(component))] < 0:
+                component *= -1
+        for row in rows:
+            scores = {}
+            for percentage in (20, 50, 80):
+                score = (row.pop(f"_pca_{percentage}") - pca_mean) @ components[:2].T
+                scores[percentage] = score
+                row[f"pca_pc1_{percentage}"] = float(score[0])
+                row[f"pca_pc2_{percentage}"] = float(score[1])
+            row["pca_VL"] = float(np.linalg.norm(scores[80] - scores[20]))
     with args.output.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=FIELDS)
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=(
+                FIELDS
+                + (FASTTRACK_FIELDS if args.fasttrack else ())
+                + (PCA_FIELDS if args.pca else ())
+            ),
+        )
         writer.writeheader()
         writer.writerows(rows)
     print(
         f"Wrote {written} tokens to {args.output}; "
-        f"annotation exclusions={skipped_annotations}, formant failures={failed_formants}"
+        f"annotation exclusions={skipped_annotations}, Praat failures={failed_formants}, "
+        f"FastTrack failures={failed_fasttrack}"
     )
     return 0
 
