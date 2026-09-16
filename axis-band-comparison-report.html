@@ -73,6 +73,26 @@
       The latter has somewhat more distance structure (.15 PCA; .20 FastTrack).</div>
   </div>
 
+  <h2>Individual vowel trajectories</h2>
+  <p>The clearest starting point is the movement of individual vowel anchors through acoustic
+    space. These three vowels were selected before considering pair geometry: /uː/ and /oː/
+    show the strongest and most consistent geographic trajectories, while /eː/ provides a
+    useful, more moderate comparison. Curves are fitted over the Löderup–Arjeplog axis; the grey
+    ellipses summarize uncertainty at representative South, Centre, and North positions.</p>
+
+  <h3>/uː/</h3><div class="plots">
+    <figure><a href="Analyses/Vowel_NS_trajectories_pca_axis_band/01_u_trajectory.png"><img loading="lazy" src="Analyses/Vowel_NS_trajectories_pca_axis_band/01_u_trajectory.png" alt="PCA trajectory for u"></a><figcaption>PCA spectral space</figcaption></figure>
+    <figure><a href="Analyses/Vowel_axis_trajectories_fasttrack_bark_axis_band/01_u_trajectory.png"><img loading="lazy" src="Analyses/Vowel_axis_trajectories_fasttrack_bark_axis_band/01_u_trajectory.png" alt="FastTrack Bark trajectory for u"></a><figcaption>FastTrack Bark formant space</figcaption></figure>
+  </div>
+  <h3>/oː/</h3><div class="plots">
+    <figure><a href="Analyses/Vowel_NS_trajectories_pca_axis_band/02_o_trajectory.png"><img loading="lazy" src="Analyses/Vowel_NS_trajectories_pca_axis_band/02_o_trajectory.png" alt="PCA trajectory for o"></a><figcaption>PCA spectral space</figcaption></figure>
+    <figure><a href="Analyses/Vowel_axis_trajectories_fasttrack_bark_axis_band/02_o_trajectory.png"><img loading="lazy" src="Analyses/Vowel_axis_trajectories_fasttrack_bark_axis_band/02_o_trajectory.png" alt="FastTrack Bark trajectory for o"></a><figcaption>FastTrack Bark formant space</figcaption></figure>
+  </div>
+  <h3>/eː/</h3><div class="plots">
+    <figure><a href="Analyses/Vowel_NS_trajectories_pca_axis_band/05_e_trajectory.png"><img loading="lazy" src="Analyses/Vowel_NS_trajectories_pca_axis_band/05_e_trajectory.png" alt="PCA trajectory for e"></a><figcaption>PCA spectral space</figcaption></figure>
+    <figure><a href="Analyses/Vowel_axis_trajectories_fasttrack_bark_axis_band/05_e_trajectory.png"><img loading="lazy" src="Analyses/Vowel_axis_trajectories_fasttrack_bark_axis_band/05_e_trajectory.png" alt="FastTrack Bark trajectory for e"></a><figcaption>FastTrack Bark formant space</figcaption></figure>
+  </div>
+
   <h2>Pair-level comparison</h2>
   <table>
     <thead><tr><th>Pair</th><th>PCA angle R²</th><th>FastTrack angle R²</th>
@@ -87,7 +107,7 @@
     </tbody>
   </table>
 
-  <h2>Plots</h2>
+  <h2>Pair plots</h2>
   <p>Each figure shows the two vowels separately, their pair vectors, and the angle and distance
     models. Click an image to open it at full resolution.</p>
 
@@ -124,6 +144,32 @@
     them less likely to be artifacts of one acoustic representation. The results therefore support
     a pair-specific account of regional vowel-system geometry, with the Löderup–Arjeplog axis as a
     useful descriptive coordinate rather than a complete model of Swedish dialect geography.</p>
+
+  <h2>Regional pair-midpoint summary</h2>
+  <p>As a final, more compressed view, the continuous trajectories are reduced to North, Centre,
+    and South. Pair midpoints are calculated within speakers, summarized within villages, and then
+    across villages so that villages—not recordings—carry equal weight. Corpus vowel anchors are
+    likewise village-balanced.</p>
+  <p>Open circles show the true two-dimensional regional midpoint. Filled circles show its
+    projection onto the corpus-wide vowel-pair axis; dotted connectors retain the perpendicular
+    component removed by that projection. Translucent ellipses show village-bootstrap uncertainty.</p>
+  <div class="plots">
+    <figure><a href="Analyses/Regional_pair_midpoints_pca_axis-band_paired-village/regional_pair_midpoint_summary.png"><img loading="lazy" src="Analyses/Regional_pair_midpoints_pca_axis-band_paired-village/regional_pair_midpoint_summary.png" alt="PCA regional pair midpoint summary"></a><figcaption>PCA spectral space: village-balanced regional pair midpoints.</figcaption></figure>
+    <figure><a href="Analyses/Regional_pair_midpoints_fasttrack_bark_axis-band_paired-village/regional_pair_midpoint_summary.png"><img loading="lazy" src="Analyses/Regional_pair_midpoints_fasttrack_bark_axis-band_paired-village/regional_pair_midpoint_summary.png" alt="FastTrack Bark regional pair midpoint summary"></a><figcaption>FastTrack Bark formant space: village-balanced regional pair midpoints.</figcaption></figure>
+  </div>
+  <div class="note"><strong>Caution.</strong> This is the most summarative and assumption-dependent
+    analysis in the report. The three-way partition and band width are analytically chosen;
+    regional medians can conceal continuous curves and local variation; and projection onto a
+    vowel-pair axis discards perpendicular movement. Several uncertainty regions overlap. These
+    production midpoints are not perceptual category boundaries and should not be treated as direct
+    evidence for a single, uniform chain shift.</div>
+  <p>The plots are best used diagnostically: agreement in regional ordering across PCA and
+    FastTrack is more informative than absolute positions, while large dotted connectors warn that
+    an along-pair account is incomplete. PCA and Bark formant coordinates are not directly
+    commensurable.</p>
+  <p><strong>Download midpoint tables:</strong>
+    <a href="Analyses/Regional_pair_midpoints_pca_axis-band_paired-village/regional_pair_midpoints.csv" download>PCA regional midpoints</a> ·
+    <a href="Analyses/Regional_pair_midpoints_fasttrack_bark_axis-band_paired-village/regional_pair_midpoints.csv" download>FastTrack regional midpoints</a></p>
 
   <p><strong>Download model tables:</strong>
     <a href="pca-axis-band/all_pair_spline_models.csv" download>PCA pair models</a> ·

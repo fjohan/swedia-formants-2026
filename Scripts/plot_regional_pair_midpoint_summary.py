@@ -286,15 +286,18 @@ def draw(path: Path, method: str, space: str, anchors: dict, rows: list[dict],
          group_order: tuple[str, ...], colors: dict[str, str],
          clouds: dict | None = None) -> None:
     fig, ax = plt.subplots(figsize=(8, 7), constrained_layout=True)
-    for first, second in PAIRS:
+    selected_pairs = [(first, second) for first, second in PAIRS
+                      if any(row["pair"] == f"{first}->{second}" for row in rows)]
+    selected_vowels = list(dict.fromkeys(vowel for pair in selected_pairs for vowel in pair))
+    for first, second in selected_pairs:
         a, b = anchors["Corpus", first], anchors["Corpus", second]
         ax.plot([a[0], b[0]], [a[1], b[1]], color="#aeb6b8", lw=3, alpha=.65)
-    for vowel in VOWELS:
+    for vowel in selected_vowels:
         point = anchors["Corpus", vowel]
         ax.scatter(*point, facecolor="white", edgecolor=VOWEL_COLORS[vowel], s=48, zorder=4)
         ax.annotate(f"/{vowel}/", point, xytext=(5, 5), textcoords="offset points",
                     color="#555", fontsize=10, fontweight="bold")
-    for first, second in PAIRS:
+    for first, second in selected_pairs:
         pair = f"{first}->{second}"
         selected = [row for row in rows if row["pair"] == pair]
         for row in selected:
@@ -361,8 +364,16 @@ def main() -> int:
     parser.add_argument("--bootstrap", type=int, default=500)
     parser.add_argument("--seed", type=int, default=20260916)
     parser.add_argument("--exclude-villages", nargs="*", default=[])
+    parser.add_argument("--first", choices=VOWELS,
+                        help="Plot only this directed pair's first vowel (requires --second).")
+    parser.add_argument("--second", choices=VOWELS,
+                        help="Plot only this directed pair's second vowel (requires --first).")
     parser.add_argument("--output-dir", type=Path)
     args = parser.parse_args()
+    if bool(args.first) != bool(args.second):
+        parser.error("--first and --second must be supplied together")
+    if args.first and (args.first, args.second) not in PAIRS:
+        parser.error("--first/--second must name one of the six canonical directed pairs")
     if args.central_margin < 0:
         parser.error("--central-margin must be non-negative")
     if args.bootstrap < 20:
@@ -409,6 +420,9 @@ def main() -> int:
         anchors = centroids(speakers)
         regional = centroids(speakers, groups)
         rows = midpoint_rows(args.method, anchors, regional, group_order)
+    if args.first:
+        selected_pair = f"{args.first}->{args.second}"
+        rows = [row for row in rows if row["pair"] == selected_pair]
 
     space = "pca" if args.method == "pca" else "bark" if args.bark else "hz"
     output_label = args.method if args.method == "pca" else f"{args.method}_{space}"
@@ -445,6 +459,7 @@ def main() -> int:
         "axis_endpoints": [args.south_endpoint, args.north_endpoint],
         "central_villages": args.central_villages,
         "central_margin": args.central_margin,
+        "selected_pair": ([args.first, args.second] if args.first else None),
         "anchors": ("village-balanced medians of speaker-vowel medians"
                     if args.midpoint_aggregation == "paired-village"
                     else "corpus-wide medians of speaker-vowel medians"),

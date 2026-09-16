@@ -1,0 +1,46 @@
+{
+  "input": "formants-all.csv",
+  "method": "praat-fixed",
+  "space": "hz",
+  "coordinate": "raw-y",
+  "partition": "proportional",
+  "south_endpoint": "loderup",
+  "north_endpoint": "arjeplog",
+  "central_villages": [
+    "tjallmo",
+    "rimforsa"
+  ],
+  "central_margin": 35.0,
+  "central_band": [
+    NaN,
+    NaN
+  ],
+  "axis_length": NaN,
+  "axis_south_coordinates": null,
+  "axis_north_coordinates": null,
+  "group_speaker_counts": {
+    "North": 0,
+    "Centre": 0,
+    "South": 0
+  },
+  "include_incomplete": false,
+  "excluded_regions": [
+    "Gotland",
+    "Nyland",
+    "Åboland",
+    "Åland",
+    "Österbotten"
+  ],
+  "excluded_villages": [
+    "borga",
+    "brando",
+    "dragsfjard",
+    "faro",
+    "houtskar",
+    "kyrkslatt",
+    "narpes",
+    "saltvik",
+    "sproge"
+  ],
+  "colors": "red south, blue north"
+}

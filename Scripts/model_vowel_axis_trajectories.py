@@ -14,7 +14,7 @@ os.environ.setdefault("MPLCONFIGDIR", "/tmp/swedia-vowel-trajectories-matplotlib
 
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
-from matplotlib.colors import Normalize
+from matplotlib.colors import LinearSegmentedColormap, Normalize
 from matplotlib.patches import Ellipse
 import numpy as np
 from scipy.stats import f as f_distribution
@@ -28,6 +28,11 @@ FILE_LABELS = {
     "eː": "e", "yː": "y", "ʉ̟ː": "central_u", "øː": "oe",
 }
 DEFAULT_EXCLUDED_REGIONS = {"Gotland", "Åboland", "Nyland", "Österbotten", "Åland"}
+GROUP_COLORS = {"South": "#c43c39", "Centre": "#777777", "North": "#315fa8"}
+AXIS_CMAP = LinearSegmentedColormap.from_list(
+    "south_centre_north", [GROUP_COLORS["South"], GROUP_COLORS["Centre"],
+                            GROUP_COLORS["North"]]
+)
 
 
 def geographic_axis(speakers: list[dict], south_name: str, north_name: str,
@@ -187,26 +192,26 @@ def plot_vowel(path: Path, vowel: str, speakers: list[dict], villages: list[dict
     speaker_y = np.asarray([row["display_y"] for row in speakers])
     speaker_geo = np.asarray([row["geo_position"] for row in speakers])
     norm = Normalize(grid.min(), grid.max())
-    # coolwarm_r maps low values to red and high values to blue.  Reverse it
-    # for legacy raw-y coordinates, where low values are northern.
-    cmap_name = "coolwarm_r" if increases_north else "coolwarm"
-    cmap = plt.get_cmap(cmap_name)
-    scatter = ax.scatter(speaker_x, speaker_y, c=speaker_geo, cmap=cmap_name,
-                         norm=norm, s=22, alpha=.38, edgecolors="none", zorder=1)
+    cmap = AXIS_CMAP if increases_north else AXIS_CMAP.reversed()
+    speaker_colors = [GROUP_COLORS.get(row.get("geographic_group"),
+                                       cmap(norm(row["geo_position"])))
+                      for row in speakers]
+    ax.scatter(speaker_x, speaker_y, c=speaker_colors,
+               s=22, alpha=.38, edgecolors="none", zorder=1)
     ax.scatter([row["display_x"] for row in villages],
                [row["display_y"] for row in villages],
                facecolors="none", edgecolors="#333", s=30, linewidth=.7,
                label="village medians", zorder=3)
 
     segments = np.stack([predicted[:-1], predicted[1:]], axis=1)
-    collection = LineCollection(segments, cmap=cmap_name, norm=norm,
+    collection = LineCollection(segments, cmap=cmap, norm=norm,
                                 linewidth=4, zorder=4)
     collection.set_array((grid[:-1] + grid[1:]) / 2)
     ax.add_collection(collection)
     for position, label, marker in marker_positions:
         index = int(np.argmin(np.abs(grid - position)))
         confidence_ellipse(ax, bootstrap[:, index, :])
-        ax.scatter(*predicted[index], marker=marker, color=cmap(norm(grid[index])),
+        ax.scatter(*predicted[index], marker=marker, color=GROUP_COLORS[label],
                    edgecolor="#111", s=85, zorder=6, label=label)
     arrow_index = round(.70 * (len(grid) - 1)) if increases_north else round(.30 * (len(grid) - 1))
     arrow_step = 2 if increases_north else -2
@@ -234,7 +239,8 @@ def plot_vowel(path: Path, vowel: str, speakers: list[dict], villages: list[dict
                  f"{len(speakers)} speakers, {len(villages)} villages")
     ax.set_aspect("equal", adjustable="datalim"); ax.grid(alpha=.18)
     ax.legend(loc="best", fontsize=8)
-    fig.colorbar(scatter, ax=ax, label=coordinate_label)
+    fig.colorbar(plt.cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax,
+                 label=coordinate_label)
     fig.savefig(path, dpi=180)
     plt.close(fig)
 
