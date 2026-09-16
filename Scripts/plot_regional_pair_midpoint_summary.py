@@ -18,7 +18,9 @@ from matplotlib.patches import Ellipse
 import numpy as np
 
 from plot_midpoint_vowel_spaces import COLORS as VOWEL_COLORS
-from plot_midpoint_vowel_spaces import PAIRS, VOWELS, read_tokens, speaker_vowels
+from plot_midpoint_vowel_spaces import (
+    PAIRS, VOWELS, method_columns, read_tokens, speaker_vowels,
+)
 
 
 GROUP_COLORS = {"North": "#c90000", "Central": "#111111", "South": "#315a9b"}
@@ -323,11 +325,13 @@ def draw(path: Path, method: str, space: str, anchors: dict, rows: list[dict],
         ax.plot([], [], color="#666", ls=":", label="projection onto pair axis")
     if method == "pca":
         xlabel, ylabel = "−PC1 (score dB)", "−PC2 (score dB)"
+        method_title = "PCA spectral scores"
     else:
         unit = "Bark" if space == "bark" else "Hz"
         xlabel, ylabel = f"−F2 ({unit})", f"−F1 ({unit})"
+        method_title = f"{'FastTrack' if method == 'fasttrack' else 'Praat fixed'} ({unit})"
     ax.set(xlabel=xlabel, ylabel=ylabel,
-           title=f"Corpus-anchored regional vowel-pair midpoints: {method}")
+           title=f"Corpus-anchored regional vowel-pair midpoints: {method_title}")
     ax.grid(alpha=.18); ax.set_aspect("equal", adjustable="datalim")
     ax.legend(loc="best", framealpha=.9)
     fig.savefig(path, dpi=190)
@@ -429,6 +433,7 @@ def main() -> int:
          anchors, rows, group_order, colors, clouds)
     (output / "settings.json").write_text(json.dumps({
         "input": str(args.input), "method": args.method, "space": space,
+        "measurement_columns": method_columns(args.method, args.bark),
         "grouping": args.grouping, "group_order": group_order,
         "midpoint_aggregation": args.midpoint_aggregation,
         "group_speaker_counts": dict(zip(group_order, sizes)),
@@ -446,6 +451,8 @@ def main() -> int:
         "bootstrap_iterations": args.bootstrap,
         "arrow_rule": "strict monotonic ordering across the three geographic groups",
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    columns = method_columns(args.method, args.bark)
+    print(f"Using acoustic columns: {columns[0]}, {columns[1]} ({space})")
     print(f"Groups contain {sizes} speakers; wrote {output}")
     return 0
 
