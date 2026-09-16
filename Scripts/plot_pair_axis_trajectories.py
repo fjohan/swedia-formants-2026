@@ -26,7 +26,7 @@ from plot_midpoint_vowel_spaces import PAIRS, VOWELS, read_tokens, speaker_vowel
 from plot_regional_pair_midpoint_summary import ALIASES, resource_provinces
 
 
-GROUP_COLORS = {"South": "#c43c39", "Centre": "#777777", "North": "#315fa8"}
+GROUP_COLORS = {"South": "#c43c39", "Centre": "#999999", "North": "#315fa8"}
 DISPLAY_NAMES = {"loderup": "Löderup", "arjeplog": "Arjeplog",
                  "tjallmo": "Tjällmo", "rimforsa": "Rimforsa"}
 AXIS_CMAP = LinearSegmentedColormap.from_list(
@@ -524,7 +524,19 @@ def main() -> int:
         write_csv(output / f"{prefix}vowel_trajectory_models.csv", endpoint_models)
         combined_spline_models.extend(spline_models)
         combined_geometry_models.extend(geometry_models)
+        angle_r2 = next(row["r2"] for row in spline_models if row["response"] == "angle")
+        distance_r2 = next(row["r2"] for row in spline_models if row["response"] == "distance")
+        fitted_angles = ", ".join(
+            f'{row["region_marker"]}={row["directed_angle_from_horizontal_deg"]:+.1f}°'
+            for row in fitted
+        )
         print(f"  /{first}/ -> /{second}/: {len(paired)} speakers, {len(villages)} villages")
+        print(f"    /{first}/ R² horizontal={first_models['first_x']['r2']:.2f}, "
+              f"vertical={first_models['first_y']['r2']:.2f}; "
+              f"/{second}/ R² horizontal={second_models['second_x']['r2']:.2f}, "
+              f"vertical={second_models['second_y']['r2']:.2f}")
+        print(f"    fitted angles: {fitted_angles}")
+        print(f"    pair models: angle R²={angle_r2:.2f}, distance R²={distance_r2:.2f}")
     write_csv(output / "all_pair_spline_models.csv", combined_spline_models)
     write_csv(output / "all_pair_predictive_models.csv", combined_geometry_models)
     print(f"Wrote {len(selected_pairs)} pair analyses to {output}")
