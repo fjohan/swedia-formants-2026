@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vowel trajectories along the Löderup–Arjeplog axis</title>
+  <style>
+    :root { color-scheme: light; --ink:#24323a; --muted:#65727a; --line:#d8dee2;
+      --panel:#f7f9fa; --blue:#315fa8; --red:#c43c39; }
+    body { max-width:1500px; margin:auto; padding:2rem; color:var(--ink);
+      font:16px/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    h1,h2,h3 { line-height:1.2; } h1 { margin-bottom:.25rem; }
+    .lead { color:var(--muted); max-width:1050px; font-size:1.08rem; }
+    .note { background:var(--panel); border-left:4px solid #8a969d; padding:.8rem 1rem; }
+    .findings { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:1rem; }
+    .finding { background:var(--panel); border:1px solid var(--line); border-radius:8px;
+      padding:1rem; }
+    table { border-collapse:collapse; width:100%; font-size:.9rem; }
+    th,td { padding:.5rem .6rem; border-bottom:1px solid var(--line); text-align:right; }
+    th:first-child,td:first-child { text-align:left; } th { background:var(--panel); }
+    .plots { display:grid; grid-template-columns:1fr 1fr; gap:1rem; align-items:start; }
+    figure { margin:0; border:1px solid var(--line); border-radius:8px; padding:.6rem;
+      background:white; }
+    img { width:100%; height:auto; display:block; }
+    figcaption { padding:.5rem .25rem 0; color:var(--muted); font-size:.9rem; }
+    details { border-top:1px solid var(--line); padding:1rem 0; }
+    summary { cursor:pointer; font-size:1.12rem; font-weight:650; }
+    a { color:#075e8c; } code { background:#eef1f3; padding:.1rem .25rem; }
+    @media (max-width:900px) { .plots { grid-template-columns:1fr; } body { padding:1rem; } }
+  </style>
+</head>
+<body>
+  <h1>Vowel trajectories along the Löderup–Arjeplog axis</h1>
+  <p class="lead">An exploratory comparison of Bark-spectrum PCA and FastTrack formants,
+    using the same speakers, geographic axis, central band, and six directed vowel pairs.</p>
+
+  <h2>Method in brief</h2>
+  <p>The analysis contains 204 complete speakers from 74 villages. Gotland and the Finnish
+    regions Åboland, Nyland, Österbotten, and Åland are excluded. Village position is projected
+    onto the line from Löderup to Arjeplog. Tjällmo and Rimforsa, with a 35-map-unit margin,
+    define the central band; villages beyond it form the southern and northern groups.</p>
+  <p>For each vowel, two coordinated natural-spline models trace its path through acoustic space
+    over the geographic axis. Models use village medians so villages contribute equally; speaker
+    observations remain visible. The grey ellipses show village-bootstrap uncertainty at the
+    representative South, Centre, and North positions. For each directed pair, the analysis also
+    models vector angle and endpoint distance over the same axis.</p>
+  <p>PCA uses the traditionally oriented −PC1/−PC2 spectral-score plane. FastTrack uses
+    traditionally oriented Bark −F2/−F1. The red–grey–blue coding denotes South–Centre–North.</p>
+
+  <div class="note"><strong>Interpretive constraint.</strong> Absolute angles in PCA and Bark
+    formant space should not be compared numerically: their axes and scaling differ. More useful
+    cross-method evidence is agreement in geographic shape, relative ordering, and explained
+    variation. These spline results are exploratory and have not been adjusted for multiple
+    comparisons or fully modelled for spatial dependence.</div>
+
+  <h2>Most promising findings</h2>
+  <div class="findings">
+    <div class="finding"><strong>/uː/ and /oː/ are the clearest individual trajectories.</strong>
+      Horizontal R² is approximately .49–.52 in both methods. For /oː/, the second dimension is
+      also substantial (PCA .49; FastTrack .38). This is the strongest cross-method agreement in
+      the analysis.</div>
+    <div class="finding"><strong>/oː–ɑː/ has the strongest replicated angle structure.</strong>
+      Pair-angle R² is .35 in PCA and .43 in FastTrack. Pair distance is weaker (.17 and .12),
+      suggesting that changing direction is more prominent than simple expansion or contraction.</div>
+    <div class="finding"><strong>/æː–eː/ shows a modest ordered tendency.</strong> Its fitted angle
+      changes monotonically from North through Centre to South in both methods. Angle R² is .15
+      in PCA and .11 in FastTrack; distance R² is .12 and .15.</div>
+    <div class="finding"><strong>/ʉ̟ː–øː/ changes in separation, not direction.</strong> Angle R² is
+      essentially zero in both methods, whereas distance R² is .26 in PCA and .16 in FastTrack.
+      This is a useful example of structure that a rotation-only account would miss.</div>
+    <div class="finding"><strong>Not every pair carries a geographic signal.</strong>
+      /ɑː–æː/ has nearly invariant angle in both analyses, and /yː–ʉ̟ː/ shows weak angle structure.
+      The latter has somewhat more distance structure (.15 PCA; .20 FastTrack).</div>
+  </div>
+
+  <h2>Pair-level comparison</h2>
+  <table>
+    <thead><tr><th>Pair</th><th>PCA angle R²</th><th>FastTrack angle R²</th>
+      <th>PCA distance R²</th><th>FastTrack distance R²</th><th>Reading</th></tr></thead>
+    <tbody>
+      <tr><td>/uː–oː/</td><td>.33</td><td>.24</td><td>.07</td><td>.13</td><td>Strong nonlinear endpoint movement; angle differs geographically</td></tr>
+      <tr><td>/oː–ɑː/</td><td>.35</td><td>.43</td><td>.17</td><td>.12</td><td>Best replicated angle result</td></tr>
+      <tr><td>/ɑː–æː/</td><td>.02</td><td>.00</td><td>.03</td><td>.10</td><td>Little evidence for changing pair geometry</td></tr>
+      <tr><td>/æː–eː/</td><td>.15</td><td>.11</td><td>.12</td><td>.15</td><td>Modest, similarly ordered change</td></tr>
+      <tr><td>/yː–ʉ̟ː/</td><td>.03</td><td>.06</td><td>.15</td><td>.20</td><td>Weak angle; some separation change</td></tr>
+      <tr><td>/ʉ̟ː–øː/</td><td>.00</td><td>.01</td><td>.26</td><td>.16</td><td>Distance-dominated geographic structure</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Plots</h2>
+  <p>Each figure shows the two vowels separately, their pair vectors, and the angle and distance
+    models. Click an image to open it at full resolution.</p>
+
+  <details open><summary>/uː/ → /oː/</summary><div class="plots">
+    <figure><a href="pca-axis-band/1_2_u_o_vowel_pair_axis_trajectories.png"><img loading="lazy" src="pca-axis-band/1_2_u_o_vowel_pair_axis_trajectories.png" alt="PCA u to o trajectories"></a><figcaption>PCA spectral space</figcaption></figure>
+    <figure><a href="ft-axis-band/1_2_u_o_vowel_pair_axis_trajectories.png"><img loading="lazy" src="ft-axis-band/1_2_u_o_vowel_pair_axis_trajectories.png" alt="FastTrack u to o trajectories"></a><figcaption>FastTrack Bark formant space</figcaption></figure>
+  </div></details>
+  <details open><summary>/oː/ → /ɑː/</summary><div class="plots">
+    <figure><a href="pca-axis-band/2_3_o_open_back_a_vowel_pair_axis_trajectories.png"><img loading="lazy" src="pca-axis-band/2_3_o_open_back_a_vowel_pair_axis_trajectories.png" alt="PCA o to a trajectories"></a><figcaption>PCA spectral space</figcaption></figure>
+    <figure><a href="ft-axis-band/2_3_o_open_back_a_vowel_pair_axis_trajectories.png"><img loading="lazy" src="ft-axis-band/2_3_o_open_back_a_vowel_pair_axis_trajectories.png" alt="FastTrack o to a trajectories"></a><figcaption>FastTrack Bark formant space</figcaption></figure>
+  </div></details>
+  <details><summary>/ɑː/ → /æː/</summary><div class="plots">
+    <figure><a href="pca-axis-band/3_4_open_back_a_ae_vowel_pair_axis_trajectories.png"><img loading="lazy" src="pca-axis-band/3_4_open_back_a_ae_vowel_pair_axis_trajectories.png" alt="PCA a to ae trajectories"></a><figcaption>PCA spectral space</figcaption></figure>
+    <figure><a href="ft-axis-band/3_4_open_back_a_ae_vowel_pair_axis_trajectories.png"><img loading="lazy" src="ft-axis-band/3_4_open_back_a_ae_vowel_pair_axis_trajectories.png" alt="FastTrack a to ae trajectories"></a><figcaption>FastTrack Bark formant space</figcaption></figure>
+  </div></details>
+  <details open><summary>/æː/ → /eː/</summary><div class="plots">
+    <figure><a href="pca-axis-band/4_5_ae_e_vowel_pair_axis_trajectories.png"><img loading="lazy" src="pca-axis-band/4_5_ae_e_vowel_pair_axis_trajectories.png" alt="PCA ae to e trajectories"></a><figcaption>PCA spectral space</figcaption></figure>
+    <figure><a href="ft-axis-band/4_5_ae_e_vowel_pair_axis_trajectories.png"><img loading="lazy" src="ft-axis-band/4_5_ae_e_vowel_pair_axis_trajectories.png" alt="FastTrack ae to e trajectories"></a><figcaption>FastTrack Bark formant space</figcaption></figure>
+  </div></details>
+  <details><summary>/yː/ → /ʉ̟ː/</summary><div class="plots">
+    <figure><a href="pca-axis-band/6_7_y_central_u_vowel_pair_axis_trajectories.png"><img loading="lazy" src="pca-axis-band/6_7_y_central_u_vowel_pair_axis_trajectories.png" alt="PCA y to central u trajectories"></a><figcaption>PCA spectral space</figcaption></figure>
+    <figure><a href="ft-axis-band/6_7_y_central_u_vowel_pair_axis_trajectories.png"><img loading="lazy" src="ft-axis-band/6_7_y_central_u_vowel_pair_axis_trajectories.png" alt="FastTrack y to central u trajectories"></a><figcaption>FastTrack Bark formant space</figcaption></figure>
+  </div></details>
+  <details open><summary>/ʉ̟ː/ → /øː/</summary><div class="plots">
+    <figure><a href="pca-axis-band/7_8_central_u_oe_vowel_pair_axis_trajectories.png"><img loading="lazy" src="pca-axis-band/7_8_central_u_oe_vowel_pair_axis_trajectories.png" alt="PCA central u to oe trajectories"></a><figcaption>PCA spectral space</figcaption></figure>
+    <figure><a href="ft-axis-band/7_8_central_u_oe_vowel_pair_axis_trajectories.png"><img loading="lazy" src="ft-axis-band/7_8_central_u_oe_vowel_pair_axis_trajectories.png" alt="FastTrack central u to oe trajectories"></a><figcaption>FastTrack Bark formant space</figcaption></figure>
+  </div></details>
+
+  <h2>Working interpretation</h2>
+  <p>The broadest defensible conclusion is not that the entire vowel system undergoes one uniform
+    rotation. Geographic organization is strongest for particular vowels and differs by pair:
+    some relationships change mainly in direction, others mainly in separation, and several show
+    little systematic change. Agreement between PCA and FastTrack for the prominent patterns makes
+    them less likely to be artifacts of one acoustic representation. The results therefore support
+    a pair-specific account of regional vowel-system geometry, with the Löderup–Arjeplog axis as a
+    useful descriptive coordinate rather than a complete model of Swedish dialect geography.</p>
+
+  <p><strong>Download model tables:</strong>
+    <a href="pca-axis-band/all_pair_spline_models.csv" download>PCA pair models</a> ·
+    <a href="ft-axis-band/all_pair_spline_models.csv" download>FastTrack pair models</a> ·
+    <a href="pca-axis-band/settings.json" download>PCA settings</a> ·
+    <a href="ft-axis-band/settings.json" download>FastTrack settings</a></p>
+</body>
+</html>
