@@ -1,7 +1,7 @@
 {
   "input": "formants-all.csv",
   "method": "fasttrack",
-  "space": "hz",
+  "space": "bark",
   "grouping": "axis-band",
   "group_order": [
     "North",
