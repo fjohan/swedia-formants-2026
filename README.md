@@ -38,4 +38,4 @@ Audio recordings are stored in `Media/` and `sounds/`, annotations in `TextGrids
 
 ## Summarizing regional pair midpoints
 
-`Scripts/plot_regional_pair_midpoint_summary.py` provides a compact regional view of vowel-pair midpoints. Speakers can be divided into approximately equal north, central, and south groups or into Norrland, Svealand, and Götaland. Arrows identify pairs with a monotonic ordering across the three groups.
+`Scripts/plot_regional_pair_midpoint_summary.py` provides a compact regional view of vowel-pair midpoints. Its default geography uses the Löderup–Arjeplog axis, the Tjällmo–Rimforsa central band, and excludes Gotland and Finland. Midpoints are calculated within speakers, aggregated within villages, and then summarized across villages; the plot distinguishes their true two-dimensional positions from projections onto the corpus pair axes and shows village-bootstrap uncertainty. Equal-sized groups, traditional lands, and the earlier centroid-based midpoint calculation remain available as legacy options. Arrows identify pairs with a monotonic ordering across the three groups.
