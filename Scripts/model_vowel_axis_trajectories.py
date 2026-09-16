@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Model one curved north-to-south trajectory per vowel in acoustic space."""
+"""Model one curved geographic-axis trajectory per vowel in acoustic space."""
 
 from __future__ import annotations
 

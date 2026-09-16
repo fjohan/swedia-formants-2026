@@ -24,7 +24,7 @@ from matplotlib.collections import LineCollection
 from matplotlib.colors import Normalize
 import numpy as np
 
-from model_vowel_north_south_trajectories import spline_basis
+from model_vowel_axis_trajectories import spline_basis
 from plot_midpoint_vowel_spaces import VOWELS, read_tokens, speaker_vowels
 
 

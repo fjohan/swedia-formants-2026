@@ -26,7 +26,11 @@ Audio recordings are stored in `Media/` and `sounds/`, annotations in `TextGrids
 
 ## Modelling vowel trajectories across geography
 
-`Scripts/model_vowel_north_south_trajectories.py` models each vowel's curved path through two-dimensional acoustic space as geographic north–south position changes. By default, position is projected onto the Löderup–Arjeplog axis, Tjällmo and Rimforsa define a central geographic band, and Gotland and Finland are excluded. The axis, partitioning, and exclusions are configurable, and the original raw-coordinate behavior remains available. Separate coordinated spline models are fitted to the two acoustic dimensions using village-level vowel positions, while individual speakers remain visible in the plots. It supports fixed Praat, FastTrack, and PCA measurements and exports model statistics, fitted positions, and bootstrap uncertainty.
+`Scripts/model_vowel_axis_trajectories.py` models each vowel's curved path through two-dimensional acoustic space as position along a geographic axis changes. By default, position is projected onto the Löderup–Arjeplog axis, Tjällmo and Rimforsa define a central geographic band, and Gotland and Finland are excluded. The axis, partitioning, and exclusions are configurable, and the original raw-coordinate behavior remains available. Separate coordinated spline models are fitted to the two acoustic dimensions using village-level vowel positions, while individual speakers remain visible in the plots. It supports fixed Praat, FastTrack, and PCA measurements and exports model statistics, fitted positions, and bootstrap uncertainty.
+
+### Modelling paired PCA trajectories
+
+`Scripts/plot_pair_axis_trajectories.py` overlays the geographic-axis trajectories of any two vowel targets and draws the connecting vector for every speaker. It supports PCA, fixed Praat, and FastTrack measurements and models how pair angle and acoustic distance vary geographically. Its default geography uses the Löderup–Arjeplog axis, a Tjällmo–Rimforsa central band, and excludes Gotland and Finland; the original raw north–south coordinate remains available. The default vowel comparison is `/uː/` to `/oː/`.
 
 ## Analysing directed vowel pairs
 
