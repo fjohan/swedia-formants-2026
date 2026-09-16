@@ -24,6 +24,10 @@ Audio recordings are stored in `Media/` and `sounds/`, annotations in `TextGrids
 
 `Scripts/analyze_north_south_vs_angle.py` relates vowel-space and midpoint-ellipse angles to geographic north–south position. It produces angle maps, correlation plots, Pearson and Spearman statistics, and village-permutation tests, with clustered treatment of speaker-level observations.
 
+## Modelling vowel trajectories across geography
+
+`Scripts/model_vowel_north_south_trajectories.py` models each vowel's curved path through two-dimensional acoustic space as geographic north–south position changes. Separate coordinated spline models are fitted to the two acoustic dimensions using village-level vowel positions, while individual speakers remain visible in the plots. It supports fixed Praat, FastTrack, and PCA measurements and exports model statistics, fitted positions, and bootstrap uncertainty.
+
 ## Analysing directed vowel pairs
 
 `Scripts/analyze_vowel_pair_geography.py` measures changes along the axis of each directed vowel pair. It separates movement of the two endpoints, movement of the pair midpoint, and expansion or compression of the pair, and models their potentially nonlinear relationship with north–south position.

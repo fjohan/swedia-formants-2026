@@ -4038,6 +4038,1086 @@ A defensible overall strategy is therefore:
 
 This would reveal whether the geographical findings reflect vowel targets, diphthongization, contextual composition, or some combination of them.</pre>
     </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Can we have a new formant analysis script that produces a table with all the target vowels. Output should be
+
+village,speaker,vowel,word,f1,f2,x,y
+
+f1,f2 simple praat-fixed values in hz, no decimals</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Created and ran the new analysis.
+
+- [Script](&lt;/data/html/dev/swedia-formants-2026/extract_praat_fixed_target_vowels.py&gt;)
+- [Output CSV](&lt;/data/html/dev/swedia-formants-2026/Analyses/praat_fixed_target_vowels.csv&gt;)
+
+The table contains 12,452 token-level rows from 92 villages and 274 speakers, with exactly:
+
+```text
+village,speaker,vowel,word,f1,f2,x,y
+```
+
+F1/F2 are integer Hz values from fixed-ceiling Praat Burg:
+
+- 5500 Hz ceiling
+- Median of 11 measurements across 45–55% of the vowel
+- Eight vowel categories
+- Base and approved alternative words
+- Surface variants retained
+- 481 tokens excluded because they lacked exactly one identifiable vowel segment
+- No formant measurement failures
+
+The eight `ref_ym_1` reference tokens are included as village `ref`; they can easily be filtered if the table should contain corpus speech only.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ah, can you use the &#x27;canonical&#x27; ipa mapping for the vowel symbol? also, good that you included &#x27;incomplete&#x27; speakers (speakers who does not have all eight target vowels), that was actually my intention. still, could you add a column, that indicates if a vowel belongs to a speaker that is &#x27;complete&#x27; (has all eiight)? simple binary 0/1 and a column &#x27;complete&#x27;. this would make it easy to filter this if needed, but we can still use vowels from incomplete speakers. That might also be useful.</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Updated and regenerated:
+
+- `vowel` now uses canonical IPA: `uː oː ɑː æː eː yː ʉ̟ː øː`
+- Added binary `complete` column.
+- Completeness is calculated per village–speaker across all recordings.
+
+Results:
+
+- 226 complete speakers
+- 48 incomplete speakers
+- 12,452 tokens total
+- 10,963 tokens from complete speakers
+- 1,489 tokens from incomplete speakers
+
+[Download updated CSV](&lt;/data/html/dev/swedia-formants-2026/Analyses/praat_fixed_target_vowels.csv&gt;)  
+[View updated script](&lt;/data/html/dev/swedia-formants-2026/extract_praat_fixed_target_vowels.py&gt;)</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Great!
+
+Now expand so we get f1_25, f2_25, f1_50, f2_50, f1_75, f2_75 where 25, 50, 75 are % into the vowel. Also assess if the vowel might be diphthongized.
+
+A practical rule of thumb would be to treat an F1–F2 Euclidean displacement of around 0.75–1 Bark or greater as clearly dynamic or diphthongized, while values between about 0.5 and 0.75 Bark can be considered intermediate. Values below 0.5 Bark would generally indicate relatively little spectral movement.
+
+The displacement can be calculated as:
+
+distance = sqrt((F1_75 - F1_25)^2 + (F2_75 - F2_25)^2)
+
+where F1 and F2 are expressed in Bark, and 25 and 75 refer to measurements taken at 25% and 75% of the vowel duration.
+
+So, yes, calculate diphth. status using bark, but output formant values in hz. Add a column diphthongized with values 0 = no diphth, 1 = intermediate diphth, 2 = clearly diphth</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Updated the script and regenerated the full table.
+
+[Download updated CSV](&lt;/data/html/dev/swedia-formants-2026/Analyses/praat_fixed_target_vowels.csv&gt;)
+
+New columns:
+
+```text
+village,speaker,vowel,word,
+f1_25,f2_25,f1_50,f2_50,f1_75,f2_75,
+x,y,complete,diphthongized
+```
+
+Each time point is a robust local median:
+
+- 25%: measurements across 20–30%
+- 50%: measurements across 45–55%
+- 75%: measurements across 70–80%
+
+`diphthongized` uses the unrounded Bark displacement:
+
+- `0`: below 0.50 Bark
+- `1`: 0.50–&lt;0.75 Bark
+- `2`: ≥0.75 Bark
+
+The Hz columns remain rounded integers. Across 12,452 tokens, the classifications are:
+
+- `0`: 4,588
+- `1`: 2,372
+- `2`: 5,492
+
+The high number classified as clearly dynamic should be interpreted cautiously: large 25–75 displacement can represent genuine dynamics, but also fixed-Praat tracking jumps. It is therefore best treated as a screening indicator rather than a definitive phonetic diagnosis.
+
+[Updated script](&lt;/data/html/dev/swedia-formants-2026/extract_praat_fixed_target_vowels.py&gt;)</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>hmm, lets switch to 20, 50 and 80 % and calc the Euclidean distance (in hertz) between the 20% and 80% temporal points. This seems to be more common. Call the column VL (vector length in F1 by F2 plane). This follows studies by Fox &amp; Jacewicz (2009) and Strycharczuk et al (2024). Skip the diphth assessment for now, we will device something based on the continuous VL instead</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Updated and regenerated the table.
+
+[Download CSV](&lt;/data/html/dev/swedia-formants-2026/Analyses/praat_fixed_target_vowels.csv&gt;)
+
+The schema is now:
+
+```text
+village,speaker,vowel,word,
+f1_20,f2_20,f1_50,f2_50,f1_80,f2_80,VL,
+x,y,complete
+```
+
+`VL` is calculated in Hz from the unrounded 20% and 80% values:
+
+```text
+VL = √((F1₈₀ − F1₂₀)² + (F2₈₀ − F2₂₀)²)
+```
+
+All displayed formants and VL are rounded to integers. The categorical diphthongization assessment has been removed.
+
+The final table contains 12,452 tokens with no formant-measurement failures.
+
+[Updated script](&lt;/data/html/dev/swedia-formants-2026/extract_praat_fixed_target_vowels.py&gt;)</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ah, wait maybe still use the robust median around these timepoints!</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Updated. The measurements are now robust medians:
+
+- `f1_20`, `f2_20`: 11 samples across 15–25%
+- `f1_50`, `f2_50`: 11 samples across 45–55%
+- `f1_80`, `f2_80`: 11 samples across 75–85%
+
+`VL` is calculated from the unrounded robust 20% and 80% summaries. The full 12,452-token CSV has been regenerated.
+
+[Download robust CSV](&lt;/data/html/dev/swedia-formants-2026/Analyses/praat_fixed_target_vowels.csv&gt;)</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok and now add an option to also include the same 20,50,80 plus VL but with fasttrack. this will let us compare in the same file</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Added and tested the `--fasttrack` option.
+
+Run with:
+
+```bash
+MPLCONFIGDIR=/tmp/swedia-fasttrack-mpl \
+fasttrackpy/bin/python extract_praat_fixed_target_vowels.py --fasttrack
+```
+
+It adds:
+
+```text
+fasttrack_f1_20,fasttrack_f2_20,
+fasttrack_f1_50,fasttrack_f2_50,
+fasttrack_f1_80,fasttrack_f2_80,
+fasttrack_VL
+```
+
+Both methods use the same robust windows:
+
+- 20%: median across 15–25%
+- 50%: median across 45–55%
+- 80%: median across 75–85%
+
+The option was verified without FastTrack failures. The full FastTrack pass has not been run because processing all 12,452 tokens will take substantially longer; the existing CSV therefore remains fixed-Praat-only until that command is run.
+
+[Updated script](&lt;/data/html/dev/swedia-formants-2026/extract_praat_fixed_target_vowels.py&gt;)</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ah, move the &#x27;x,y,complete&#x27; (which are more metadata-like) to the column after word (so the formants part is kept together). maybe also reaname x,y to geo_x,geo_y or something more descriptive. and rename fasttrack_f1_20 etc to abbreviated ft_f1_20 etc</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Updated and tested the schema:
+
+```text
+village,speaker,vowel,word,geo_x,geo_y,complete,
+f1_20,f2_20,f1_50,f2_50,f1_80,f2_80,VL,
+ft_f1_20,ft_f2_20,ft_f1_50,ft_f2_50,ft_f1_80,ft_f2_80,ft_VL
+```
+
+The existing fixed-only CSV has also been regenerated with the reordered metadata and renamed geographic columns.
+
+[Download current CSV](&lt;/data/html/dev/swedia-formants-2026/Analyses/praat_fixed_target_vowels.csv&gt;)  
+[Updated script](&lt;/data/html/dev/swedia-formants-2026/extract_praat_fixed_target_vowels.py&gt;)</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>great! and now yet another option that adds the pca values fo 20,50 and 80 as well. i suppose this will be a quite expensive operation, but it will good to have it all in one file. i suppose pca values should not be rounded. also the VL calculation will be in a different &#x27;unit&#x27; (what&#x27;s the &#x27;unit&#x27; of pca?), but nevertheless good to have.</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Added and verified the `--pca` option, including combined use with `--fasttrack`.
+
+New columns:
+
+```text
+pca_pc1_20,pca_pc2_20,
+pca_pc1_50,pca_pc2_50,
+pca_pc1_80,pca_pc2_80,
+pca_VL
+```
+
+The PCA measurements use the same robust 15–25%, 45–55%, and 75–85% windows. PCA values and `pca_VL` retain full decimal precision.
+
+Run all three methods together with:
+
+```bash
+MPLCONFIGDIR=/tmp/swedia-fasttrack-mpl \
+fasttrackpy/bin/python extract_praat_fixed_target_vowels.py \
+  --fasttrack --pca
+```
+
+The PCA is fitted globally during each run, balancing contributions by speaker, vowel, and temporal point. Consequently, PCA scores from a limited test run are not directly comparable with scores from the full-corpus run.
+
+Because the input variables are centered Bark-band energies in dB, the PC scores are weighted combinations of dB values. `pca_VL` is therefore a Euclidean distance in PC-score/dB space—not Hz or Bark—and should primarily be compared within the same fitted PCA model.
+
+[Updated script](&lt;/data/html/dev/swedia-formants-2026/extract_praat_fixed_target_vowels.py&gt;)</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>i ran into a runtime warning with fasttrack for either are_ym_3 or arjeplog_ym_1. can you check</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>The warning comes from `arjeplog_ym_1`, not `are_ym_3`.
+
+It concerns the fourth `typ` token:
+
+```text
+Vowel interval: 88.529–88.726 s
+```
+
+FastTrackPy encountered a non-positive value in one candidate while calculating its logarithmic loss:
+
+```text
+invalid value encountered in log
+```
+
+The analysis nevertheless completed successfully. The selected FastTrack measurements are finite and plausible:
+
+```text
+20%: F1 385, F2 1813
+50%: F1 345, F2 1852
+80%: F1 370, F2 1906
+VL: 94 Hz
+```
+
+This therefore appears to be a rejected/irrelevant candidate rather than corruption of the winning track. No action is required, although retaining the warning is useful diagnostically.
+
+I also improved the script so future FastTrack warnings identify the recording, word, and vowel interval. A new `--recordings` option allows targeted reruns such as:
+
+```bash
+fasttrackpy/bin/python extract_praat_fixed_target_vowels.py \
+  --fasttrack --recordings arjeplog_ym_1
+```</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>just for info: made some directory cleaning
+
+moved (almost) all python scripts to subdir Scripts
+moved all tsv files to subdir csv
+moved all review directories to subdir Reviews
+moved all php cache files to Php-cache</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Noted. I’ll use the new layout going forward:
+
+- Python scripts: `Scripts/`
+- CSV/TSV data: `csv/`
+- Review studies: `Reviews/`
+- PHP cache files: `Php-cache/`
+
+I’ll also check imports and relative paths before modifying or running existing scripts, since some may still assume the previous repository-root locations.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>i have run the extract script and all formant/pca data is now in formants-all.csv. we could now check the correlation between the three VL measurements to check how they deal with/represent diphthingization. can you make a script that uses the formants-all.csv file (as default, maybe have an option so we could use other files) and calculates and plots correlation between the methods.</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Created and ran the correlation analysis.
+
+[View correlation plot](&lt;/data/html/dev/swedia-formants-2026/Analyses/VL_method_correlations/vl_method_correlations.png&gt;)
+
+Overall token-level correlations:
+
+| Comparison | Pearson r | Spearman ρ |
+|---|---:|---:|
+| Praat fixed–FastTrack | 0.698 | 0.811 |
+| Praat fixed–PCA | 0.481 | 0.512 |
+| FastTrack–PCA | 0.541 | 0.517 |
+
+Praat and FastTrack therefore agree strongly on the ranking of vowel dynamics, although the lower Pearson value indicates substantial disagreement in absolute VL—probably including tracking outliers.
+
+PCA shows moderate agreement with both formant methods. This is reasonable: PCA trajectory length captures changes across the full spectral shape rather than only movement in F1/F2.
+
+The CSV also reports correlations separately for every vowel, avoiding inflation caused by pooling intrinsically different vowel categories.
+
+Files:
+
+- [Analysis script](&lt;/data/html/dev/swedia-formants-2026/Scripts/analyze_vl_method_correlations.py&gt;)
+- [Correlation statistics](&lt;/data/html/dev/swedia-formants-2026/Analyses/VL_method_correlations/vl_method_correlations.csv&gt;)
+
+The script defaults to `formants-all.csv` but supports alternatives:
+
+```bash
+swedia-pca/bin/python Scripts/analyze_vl_method_correlations.py \
+  --input another-file.csv
+```
+
+It also supports `--complete-only`.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>write a short and very general README.md for github. add two sections with brief descriptions of 1) the script extract_praat_fixed_target_vowels.py and 2) analyze_vl_method_correlations.py</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Created a short GitHub README with:
+
+- General project description and directory layout
+- Vowel-measurement extraction section
+- VL correlation-analysis section
+
+[View README.md](&lt;/data/html/dev/swedia-formants-2026/README.md&gt;)</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok, one more reorganization: all the &#x27;old&#x27; python scripts are now in MoreScripts, the &#x27;new&#x27; ones (extract... and analyze_vl...) are still in Scripts</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Noted. Going forward I’ll treat:
+
+- `Scripts/` as the current primary analysis scripts
+- `MoreScripts/` as older or supporting scripts
+- `Analyses/` as generated results
+- `Reviews/` as review experiments
+- `tsv/` as TSV data
+- `Php-cache/` as cached PHP state
+
+The README’s references to the two current scripts remain correct.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>yes, and now we can update the script that produces f1-f2 midpoint_vowel_spaces with angular calculation, midpoints and arrows.
+
+it should use formants-all.csv file (as default, have an option so we could use other files)
+option to select praat-fixed, fasttrack or pca (pca should be rotated to show traditional orientation)
+option to group by village
+option to plot
+option to use non-complete speakers
+
+the script should also save output that can be used for north-south vs angle
+
+either write a new script of if you think its better, use the existing script in MoreScripts, but put the new one in Scripts</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Created a new current script:
+
+[Scripts/plot_midpoint_vowel_spaces.py](&lt;/data/html/dev/swedia-formants-2026/Scripts/plot_midpoint_vowel_spaces.py&gt;)
+
+It defaults to `formants-all.csv` and supports:
+
+```bash
+--input FILE
+--method praat-fixed|fasttrack|pca
+--group-by village|speaker
+--include-incomplete
+--plot
+--output-dir DIRECTORY
+```
+
+Complete speakers are used by default. Village values are speaker-balanced medians.
+
+Example:
+
+```bash
+swedia-pca/bin/python Scripts/plot_midpoint_vowel_spaces.py \
+  --method fasttrack \
+  --group-by village \
+  --include-incomplete \
+  --plot
+```
+
+Each run writes:
+
+- `vowel_positions.csv`
+- `pair_midpoints.csv`
+- `ellipse_angles.csv`
+- Paginated `midpoint_vowel_spaces*.png` files when `--plot` is specified
+
+The plots contain vowel positions, directed arrows, pair midpoints, vowel ellipses, midpoint ellipses, angles, and stability ratios.
+
+`ellipse_angles.csv` is ready for north–south analysis and includes:
+
+```text
+method,grouping,village,speaker,fit_basis,
+geo_x,geo_y,ellipse_angle_from_horizontal_signed_deg,
+axis_ratio,orientation_reliable
+```
+
+PCA is displayed and analysed in the established traditional orientation using `−PC1` horizontally and `−PC2` vertically.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>update the README.md with a brief new section about this script</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Updated [README.md](&lt;/data/html/dev/swedia-formants-2026/README.md&gt;) with a brief section about `plot_midpoint_vowel_spaces.py`.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ah, now i realise we need to be able to get bark values from the extract script. can we just calculate those from the hz values? will the VL calculations be correct?</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Yes. Added a `--bark` option to the extraction script.
+
+It adds fixed-Praat columns:
+
+```text
+bark_f1_20,bark_f2_20
+bark_f1_50,bark_f2_50
+bark_f1_80,bark_f2_80
+bark_VL
+```
+
+With `--fasttrack`, it also adds:
+
+```text
+ft_bark_f1_20,ft_bark_f2_20
+ft_bark_f1_50,ft_bark_f2_50
+ft_bark_f1_80,ft_bark_f2_80
+ft_bark_VL
+```
+
+The calculations are correct:
+
+- `VL` remains Euclidean displacement in Hz.
+- `bark_VL` is calculated separately after transforming each unrounded F1/F2 endpoint into Bark.
+- It does not attempt to transform the Hz VL itself.
+
+Run everything together with:
+
+```bash
+MPLCONFIGDIR=/tmp/swedia-fasttrack-mpl \
+fasttrackpy/bin/python Scripts/extract_praat_fixed_target_vowels.py \
+  --fasttrack --pca --bark \
+  --output formants-all.csv
+```
+
+I also repaired the extractor’s imports following the move of supporting scripts into `MoreScripts/`.
+
+[Updated extractor](&lt;/data/html/dev/swedia-formants-2026/Scripts/extract_praat_fixed_target_vowels.py&gt;)</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok, now the new analyze_vl... and plot_midpoint... scripts need a --bark option as well so we can use this</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Both scripts now support `--bark`.
+
+For VL correlations:
+
+```bash
+swedia-pca/bin/python Scripts/analyze_vl_method_correlations.py --bark
+```
+
+This compares:
+
+- `bark_VL`
+- `ft_bark_VL`
+- `pca_VL`
+
+Results default to:
+
+```text
+Analyses/VL_method_correlations_bark/
+```
+
+For midpoint vowel spaces:
+
+```bash
+swedia-pca/bin/python Scripts/plot_midpoint_vowel_spaces.py \
+  --method fasttrack \
+  --bark \
+  --group-by village \
+  --plot
+```
+
+This selects:
+
+- `bark_f1_50` and `bark_f2_50` for fixed Praat
+- `ft_bark_f1_50` and `ft_bark_f2_50` for FastTrack
+- The existing PC1/PC2 values for PCA, which are unchanged by `--bark`
+
+Bark midpoint results use distinct output directories such as:
+
+```text
+Analyses/Midpoint_vowel_spaces_fasttrack_bark_village/
+```
+
+All Bark pathways were tested end to end with fixed Praat, FastTrack, and PCA data.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>but maybe we can have a quicker converter script that just recalculates the bark values from the existing hz values? even if they are rounded. i think the VL calculations will be roughly correct too. or am i missing something?</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Yes—the shortcut is entirely reasonable.
+
+Created:
+
+[Scripts/add_bark_to_formants.py](&lt;/data/html/dev/swedia-formants-2026/Scripts/add_bark_to_formants.py&gt;)
+
+By default it reads `formants-all.csv` and writes `formants-all-bark.csv`:
+
+```bash
+swedia-pca/bin/python Scripts/add_bark_to_formants.py
+```
+
+To update the existing file atomically:
+
+```bash
+swedia-pca/bin/python Scripts/add_bark_to_formants.py \
+  --input formants-all.csv \
+  --output formants-all.csv
+```
+
+It calculates Bark F1/F2 and Bark VL for both Praat and FastTrack. Existing PCA columns are preserved unchanged.
+
+In a comparison against Bark values calculated from unrounded measurements, the maximum Bark-VL difference caused by using rounded Hz values was approximately `0.008 Bark` for both methods—negligible relative to tracking and measurement variation.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>add a subsection to the readme under Extracting vowel measurements about this converter script</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Added the converter subsection under “Extracting vowel measurements” in [README.md](&lt;/data/html/dev/swedia-formants-2026/README.md&gt;).</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok and now we can update the script that produces the north-south vs angle caclulation</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Created a new current north–south analysis script:
+
+[Scripts/analyze_north_south_vs_angle.py](&lt;/data/html/dev/swedia-formants-2026/Scripts/analyze_north_south_vs_angle.py&gt;)
+
+It reads the `ellipse_angles.csv` produced by `plot_midpoint_vowel_spaces.py` and generates:
+
+- Geographic angle maps
+- Angle-versus-north–south scatterplots
+- Pearson and Spearman correlations
+- Village-permutation p-values
+- Automatic village-clustered inference for speaker-level results
+- Separate analyses for vowel and midpoint ellipses
+- Gray markers for unstable ellipses
+- Red-negative/blue-positive angle coloring
+
+Example Bark workflow:
+
+```bash
+swedia-pca/bin/python Scripts/plot_midpoint_vowel_spaces.py \
+  --method fasttrack --bark --group-by village --plot
+
+swedia-pca/bin/python Scripts/analyze_north_south_vs_angle.py \
+  --input Analyses/Midpoint_vowel_spaces_fasttrack_bark_village/ellipse_angles.csv
+```
+
+Useful options include:
+
+```text
+--fit-basis vowels|midpoints|both
+--include-reference
+--angle-limit 50
+--permutations 10000
+--output-dir DIRECTORY
+```
+
+I also ran the default fixed-Praat Hz analysis as a test:
+
+- [North–south plot](&lt;/data/html/dev/swedia-formants-2026/Analyses/Midpoint_vowel_spaces_praat-fixed_village/north_south_vs_angle.png&gt;)
+- [Correlation table](&lt;/data/html/dev/swedia-formants-2026/Analyses/Midpoint_vowel_spaces_praat-fixed_village/north_south_angle_correlations.csv&gt;)
+
+One methodological caution: angles in raw Hz are strongly affected by the unequal numerical scales of F1 and F2. Bark or globally standardized coordinates are more defensible for comparing geometric orientation.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok and now we can update the script for pairwise comparisons with endpoints, midpoints and separation</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Created a new current pairwise-analysis script:
+
+[Scripts/analyze_vowel_pair_geography.py](&lt;/data/html/dev/swedia-formants-2026/Scripts/analyze_vowel_pair_geography.py&gt;)
+
+It defaults to `formants-all.csv` and supports:
+
+```text
+--method praat-fixed|fasttrack|pca
+--bark
+--group-by speaker|village
+--include-incomplete
+--include-reference
+--plot
+--input FILE
+--output-dir DIRECTORY
+```
+
+For each directed vowel pair, it calculates:
+
+- First endpoint displacement
+- Second endpoint displacement
+- Pair-midpoint displacement
+- Observed pair separation
+- Separation change: negative compression, positive expansion
+
+Pair axes and reference positions are defined using corpus-wide, speaker-balanced vowel medians—not synthetic prototypes.
+
+Example:
+
+```bash
+swedia-pca/bin/python Scripts/analyze_vowel_pair_geography.py \
+  --method fasttrack \
+  --bark \
+  --group-by speaker \
+  --include-incomplete \
+  --plot
+```
+
+Each run produces:
+
+- `corpus_vowel_anchors.csv`
+- `pair_measurements.csv`
+- `pair_village_means.csv`
+- `pair_north_south_statistics.csv`
+- `pair_endpoints_midpoints_separation.png` with `--plot`
+
+Speaker-level plots show individual observations, but nonlinear curves and statistics are fitted to village medians to prevent villages with more speakers from receiving greater weight. Fixed-Praat, FastTrack Bark, and PCA paths were tested successfully.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok and also the summary script</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Created the updated summary script:
+
+[Scripts/plot_regional_pair_midpoint_summary.py](&lt;/data/html/dev/swedia-formants-2026/Scripts/plot_regional_pair_midpoint_summary.py&gt;)
+
+It reads `formants-all.csv` by default and supports:
+
+```text
+--method praat-fixed|fasttrack|pca
+--bark
+--grouping equal|lands
+--include-incomplete
+--include-reference
+--exclude-villages ...
+--input FILE
+--output-dir DIRECTORY
+```
+
+Example:
+
+```bash
+swedia-pca/bin/python Scripts/plot_regional_pair_midpoint_summary.py \
+  --method fasttrack \
+  --bark \
+  --grouping equal \
+  --include-incomplete
+```
+
+The equal grouping divides geographically ordered villages into three groups with approximately equal speaker counts. The `lands` option uses Norrland, Svealand, and Götaland.
+
+Outputs include:
+
+- `regional_pair_midpoint_summary.png`
+- `regional_pair_midpoints.csv`
+- `regional_group_assignments.csv`
+- `settings.json`
+
+Corpus-wide speaker-balanced vowel medians provide the anchors. Regional pair midpoints are projected onto each pair’s own directed axis. Arrows are drawn only when the three groups exhibit a strictly monotonic north-to-central-to-south ordering.
+
+Praat, FastTrack Bark, PCA, equal-group, lands, and incomplete-speaker paths were tested successfully.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>and update readme with info on these last three scripts</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Updated [README.md](&lt;/data/html/dev/swedia-formants-2026/README.md&gt;) with sections covering:
+
+- North–south ellipse-angle analysis
+- Directed vowel-pair geography
+- Regional pair-midpoint summaries</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Lets try to model the north-south of individual vowel anchors.
+
+Can we try modelling a nonlinear trajectory through a two-dimensional response space? So that the north-south sort of curves around in 2d space.
+
+If we plot f1 and f2 (or PCA equivalents) of the same speaker and vowel and each point &#x27;knows&#x27; its n-s value, we should be able to model how it curves along the n-s even if it is laid out in 2d by the formant data
+
+Not sure i am explaining this correct. Do you see what i mean?</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Yes. You want one geographical trajectory for each vowel through acoustic two-dimensional space.
+
+For a given vowel, every speaker contributes:
+
+```text
+geographic north–south position → acoustic position (F1, F2)
+```
+
+We can fit two coordinated nonlinear functions:
+
+```text
+F1 = s(geo_y)
+F2 = s(geo_y)
+```
+
+Using the same spline structure for both responses. Evaluating both smooths over an ordered north-to-south grid gives a parametric 2D trajectory:
+
+```text
+(F1(y), F2(y))
+```
+
+That trajectory can bend through the vowel space rather than reducing change to a single F1 trend, F2 trend, pair axis, or ellipse angle. We could plot:
+
+- individual speaker points, coloured by north–south position;
+- the fitted 2D curve through those points;
+- markers at representative northern, central, and southern positions;
+- arrows indicating the north-to-south direction;
+- uncertainty bands around the trajectory, if practical.
+
+This could be done separately for every vowel and for fixed Praat, FastTrack, Bark, or PCA coordinates.
+
+The main statistical caution is that fitting F1 and F2 independently does not formally model their residual covariance. However, it still gives a valid and interpretable estimated trajectory. A more advanced alternative would be a bivariate GAM or principal curve, but I would start with paired splines using identical knots and village-balanced fitting. That directly answers the geographical question and is much easier to validate.
+
+Speaker points can remain visible, but the smooth should either:
+
+- be fitted to village-level vowel medians, or
+- use speaker observations with village-aware weighting/random effects.
+
+Given this dataset, village-balanced smooths overlaid on individual speakers are the cleanest first analysis. This is a good next step and arguably represents geographic vowel change more faithfully than global ellipse rotation.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>yes can we do this, im thinking one plot/model per vowel to start with</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Implemented and ran the two-dimensional north–south trajectory analysis.
+
+[Script](&lt;/data/html/dev/swedia-formants-2026/Scripts/model_vowel_north_south_trajectories.py&gt;)
+
+For each vowel, it:
+
+- Uses individual speaker midpoint positions as displayed observations.
+- Calculates village medians for balanced modelling.
+- Fits F1 and F2—or PC1 and PC2—against geographic y using the same nonlinear spline basis.
+- Combines the two fitted responses into a curved path through acoustic space.
+- Colours observations and the fitted path from north to south.
+- Marks northern, central, and southern fitted positions.
+- Shows village-bootstrap uncertainty ellipses.
+- Reports overall and nonlinear tests separately for both acoustic dimensions.
+
+I generated all eight vowel models for:
+
+- [Fixed Praat in Bark](&lt;/data/html/dev/swedia-formants-2026/Analyses/Vowel_NS_trajectories_praat-fixed_bark&gt;)
+- [FastTrack in Bark](&lt;/data/html/dev/swedia-formants-2026/Analyses/Vowel_NS_trajectories_fasttrack_bark&gt;)
+- [Spectral PCA](&lt;/data/html/dev/swedia-formants-2026/Analyses/Vowel_NS_trajectories_pca&gt;)
+
+Each directory contains eight PNGs plus:
+
+- `trajectory_model_statistics.csv`
+- `trajectory_predictions.csv`
+- `village_vowel_positions.csv`
+
+Example rerun:
+
+```bash
+swedia-pca/bin/python Scripts/model_vowel_north_south_trajectories.py \
+  --method fasttrack --bark
+```
+
+Incomplete speakers remain excluded by default; use `--include-incomplete` to include their available vowels.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ha, it seems to work fairly well for u and o, with all methods, am i correct</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Yes, particularly `/oː/`.
+
+- `/oː/` shows strong nonlinear geographical structure in both dimensions across fixed Praat, FastTrack, and PCA. Explained variance ranges roughly from 28–55% per coordinate.
+- `/uː/` shows a strong, consistent nonlinear horizontal trajectory across all methods, explaining about 33–49%. Its vertical component is weaker in fixed Praat, but clear in FastTrack and PCA.
+
+The broad shape and direction agree across independently derived acoustic representations. That makes these patterns considerably more convincing than a result appearing in only one tracker.
+
+The main caveat is that the smooth curves near Sweden’s northern and southern extremes have less support and greater uncertainty. But yes: `/uː/` and especially `/oː/` look like strong candidates for a genuine geographically structured change.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>Lets try to get the angle between two vowels in a pair. We could try to plot the ns trajectories for both vowels of a vowel pair. then draw a line between each vowel pair for a speaker. Lets try it first just for the u-o pair and pca</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Implemented and ran the first paired-trajectory analysis for PCA `/uː/ → /oː/`.
+
+[View the plot](&lt;/data/html/dev/swedia-formants-2026/Analyses/PCA_pair_NS_trajectory_u_o/pair_trajectories_and_angles.png&gt;)
+
+The left panel shows:
+
+- `/uː/` and `/oː/` north–south trajectories
+- 225 speaker-specific connecting vectors
+- Fitted northern, central, and southern pair vectors
+- Their directed angles from horizontal
+
+The fitted pair changes substantially:
+
+| Position | Angle | Length |
+|---|---:|---:|
+| North | −114.9° | 9.8 |
+| Centre | −105.6° | 10.9 |
+| South | −44.8° | 11.7 |
+
+The angle model explains about 24% of village-level variation:
+
+- Overall spline: `p = 8.84 × 10⁻⁵`
+- Nonlinear component: `p = 0.0012`
+
+This suggests that `/uː/` and `/oː/` do not merely move together geographically: the orientation of the pair itself changes, particularly toward the south.
+
+Files:
+
+- [Script](&lt;/data/html/dev/swedia-formants-2026/Scripts/plot_pca_pair_north_south_trajectories.py&gt;)
+- [Speaker pair angles](&lt;/data/html/dev/swedia-formants-2026/Analyses/PCA_pair_NS_trajectory_u_o/speaker_pair_angles.csv&gt;)
+- [Fitted north/centre/south summary](&lt;/data/html/dev/swedia-formants-2026/Analyses/PCA_pair_NS_trajectory_u_o/fitted_pair_summary.csv&gt;)</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>the other obvious parameter is the distance btw the vowels per speaker, &#x27;speaker pair distance over n-s position&#x27;. let see that for the same pair and pca. interesting also if a model incorporating both angle and distance will explain more variation</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Added speaker pair distance and the combined geometry comparison.
+
+[View updated three-panel plot](&lt;/data/html/dev/swedia-formants-2026/Analyses/PCA_pair_NS_trajectory_u_o/pair_trajectories_angles_distances.png&gt;)
+
+For `/uː/ → /oː/` in PCA space:
+
+| Response | Spline R² | Overall p | Nonlinear p |
+|---|---:|---:|---:|
+| Pair angle | 0.236 | 0.000088 | 0.0012 |
+| Pair distance | 0.052 | 0.235 | 0.122 |
+
+Distance therefore varies considerably among speakers but shows little systematic north–south structure.
+
+The reverse geographic prediction comparison confirms that distance adds essentially nothing:
+
+| Predictors of geographic y | R² | Adjusted R² | 10-fold CV R² |
+|---|---:|---:|---:|
+| Angle | 0.094 | 0.083 | 0.048 |
+| Distance | 0.000 | −0.012 | −0.048 |
+| Angle + distance | 0.094 | 0.071 | 0.035 |
+
+Adding distance slightly worsens adjusted and cross-validated performance. For this pair, the useful geographical signal concerns orientation rather than separation.
+
+Outputs:
+
+- [Forward spline models](&lt;/data/html/dev/swedia-formants-2026/Analyses/PCA_pair_NS_trajectory_u_o/pair_geometry_spline_models.csv&gt;)
+- [Combined predictive models](&lt;/data/html/dev/swedia-formants-2026/Analyses/PCA_pair_NS_trajectory_u_o/pair_geometry_predictive_models.csv&gt;)
+- [Village geometry](&lt;/data/html/dev/swedia-formants-2026/Analyses/PCA_pair_NS_trajectory_u_o/village_pair_geometry.csv&gt;)</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>more input from colleague: suggests using mean of tjällmo and rimforsa (these are around linköping so makes sense in terms of the speaker in the perception study) as references, both geo and production-wise. this would also change the modelling of the geo variable. i still like the layout with parameters &#x27;curving&#x27; around in vowel space, but it would somehow req a new way of looking at the geography, essentualy the north-cental-south is not the best way anymore. angle seems useful, distance maybe less so, but may come in new light now. what can we do? any changes should be in a new script.</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Using Tjällmo–Rimforsa as the reference suggests moving from a single north–south predictor to a genuinely two-dimensional geographic model.
+
+I would define:
+
+- Geographic reference: mean `geo_x` and `geo_y` of Tjällmo and Rimforsa.
+- Acoustic reference: equal-village mean of their speaker-level vowel positions.
+- For every location: geographic displacement from the reference, expressed as distance and bearing.
+- For every vowel: acoustic displacement from the corresponding reference vowel.
+
+Then fit two spatial surfaces for each vowel:
+
+```text
+acoustic_x = s(geo_x, geo_y)
+acoustic_y = s(geo_x, geo_y)
+```
+
+This preserves the appealing curved trajectories. A path can be traced geographically from the reference toward any village—or along selected bearings—and the two fitted surfaces translate that path into a potentially curved trajectory through vowel space.
+
+Useful outputs would be:
+
+1. A geographic map showing the fitted spatial surface or acoustic displacement.
+2. A vowel-space plot with the Tjällmo–Rimforsa reference position and fitted trajectories radiating toward geographic sectors.
+3. Acoustic distance from reference versus geographic distance.
+4. Acoustic direction versus geographic bearing.
+5. For `/uː–oː/`, spatial surfaces for pair angle and pair distance.
+
+The last point may clarify the present result. Pair distance could have little relationship with north–south position but still vary east–west, radially from Linköping, or differently by bearing. Pair angle may likewise form a spatial gradient that the north–south spline only approximates.
+
+I would not reduce geography immediately to “distance from Linköping.” Equal distances north and south can correspond to opposite dialect patterns. Distance and bearing—or directly a two-dimensional spatial smooth—retain that distinction.
+
+A defensible first new script would therefore:
+
+- use PCA initially;
+- use speaker-balanced village medians;
+- fit separate 2D spatial surfaces for `/uː/` and `/oː/`;
+- derive their fitted pair angle and distance;
+- mark the Tjällmo–Rimforsa geographic and acoustic reference;
+- show predicted acoustic trajectories from the reference toward several geographic bearings;
+- use village-level cross-validation to compare:
+
+```text
+north–south only
+distance from reference only
+distance + bearing
+full 2D spatial model
+```
+
+That directly tests whether replacing north–south with reference-centred two-dimensional geography actually improves prediction, rather than merely producing a more elaborate visualization. I agree this belongs in a new script.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok go ahead</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Implemented and ran the new reference-centred analysis without modifying the existing north–south workflow.
+
+New script: [plot_pca_pair_reference_geography.py](/data/html/dev/swedia-formants-2026/Scripts/plot_pca_pair_reference_geography.py)
+
+Main outputs:
+
+- [Reference geography and acoustic paths](/data/html/dev/swedia-formants-2026/Analyses/PCA_pair_reference_geography_u_o/reference_geography_and_acoustic_paths.png)
+- [Cross-validation comparison](/data/html/dev/swedia-formants-2026/Analyses/PCA_pair_reference_geography_u_o/geographic_model_cross_validation.png)
+- [Model statistics CSV](/data/html/dev/swedia-formants-2026/Analyses/PCA_pair_reference_geography_u_o/geographic_model_comparison.csv)
+- [Village geometry CSV](/data/html/dev/swedia-formants-2026/Analyses/PCA_pair_reference_geography_u_o/village_pair_reference_geometry.csv)
+
+The Tjällmo–Rimforsa geographic reference is `(131, 426.5)`. Results for `/uː–oː/`:
+
+| Geographic model | Vowel endpoints CV R² | Pair angle CV R² | Pair distance CV R² |
+|---|---:|---:|---:|
+| Distance only | 0.01 | 0.04 | −0.08 |
+| Distance + bearing | 0.23 | −0.06 | −0.16 |
+| Smooth 2D | 0.29 | 0.03 | −0.06 |
+
+The important preliminary result is that full vowel positions have reproducible two-dimensional geographical structure, but distance from the reference alone does not capture it. Pair angle and especially pair distance are not individually predictable here. Thus the geographic signal seems to concern coordinated movement of both vowel anchors rather than a simple radial rotation or expansion away from Linköping.
+
+Run it with:
+
+```bash
+swedia-pca/bin/python Scripts/plot_pca_pair_reference_geography.py
+```
+
+Other vowel pairs can be selected using `--first` and `--second`.</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok pure euclidean distance from ref appears non-informative. one thing we need to add first is that finland and gotland should be exluded (we did that previously, but have not done thst yet with the &#x27;new&#x27; scripts. this of course compacts the x dimension even more</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Added the exclusion as the default and reran the analysis.
+
+Excluded regions:
+
+- Gotland
+- Åboland
+- Nyland
+- Österbotten
+- Åland
+
+This removed 9 analyzed villages, leaving 74 villages and 204 speakers. The excluded villages are recorded in [excluded_villages.csv](/data/html/dev/swedia-formants-2026/Analyses/PCA_pair_reference_geography_u_o/excluded_villages.csv).
+
+Updated results:
+
+| Model | Endpoint CV R² | Angle CV R² | Distance CV R² |
+|---|---:|---:|---:|
+| Reference distance | 0.002 | 0.089 | −0.068 |
+| Distance + bearing | 0.314 | −0.146 | 0.023 |
+| Smooth 2D geography | 0.360 | −0.038 | 0.097 |
+
+Pure Euclidean distance remains uninformative for the vowel positions. The useful geographic signal is clearly two-dimensional. Pair distance now has a modest full-2D signal, but pair angle does not generalize well in this reference-centred formulation.
+
+Updated plots:
+
+- [Geography and acoustic paths](/data/html/dev/swedia-formants-2026/Analyses/PCA_pair_reference_geography_u_o/reference_geography_and_acoustic_paths.png)
+- [Cross-validation comparison](/data/html/dev/swedia-formants-2026/Analyses/PCA_pair_reference_geography_u_o/geographic_model_cross_validation.png)
+
+The filter can be disabled for sensitivity analysis with:
+
+```bash
+--include-finland-gotland
+```</pre>
+    </section>
+<section class="message user">
+      <div class="label">User</div>
+      <pre>ok lets go back to the tripartite analysis. use the löderup-arvidsjaur axis as the &#x27;north-south&#x27; (they are most south and north, respectively). form a &#x27;central&#x27; group around tjallmo and rimforsa, maybe as a band covering the full x dimension.  and then &#x27;south&#x27; and &#x27;north&#x27; what is below and above that band geographically. a bit ad hoc but lets see it. maybe this needs a new script as well</pre>
+    </section>
+<section class="message assistant">
+      <div class="label">Codex</div>
+      <pre>Implemented a separate axis-and-band tripartite script:
+
+[plot_axis_band_pair_midpoint_summary.py](/data/html/dev/swedia-formants-2026/Scripts/plot_axis_band_pair_midpoint_summary.py)
+
+Because Arvidsjaur is absent from the corpus, the default northern endpoint is Arjeplog. The central band spans the projected positions of Tjällmo and Rimforsa plus 35 map units on either side. Finland and Gotland remain excluded.
+
+Groups:
+
+- North: 34 villages, 93 speakers
+- Central: 22 villages, 61 speakers
+- South: 18 villages, 50 speakers
+
+Outputs:
+
+- [Geographic group definition](/data/html/dev/swedia-formants-2026/Analyses/Axis_band_pair_midpoints_pca/geographic_group_definition.png)
+- [PCA midpoint summary](/data/html/dev/swedia-formants-2026/Analyses/Axis_band_pair_midpoints_pca/regional_pair_midpoint_summary.png)
+- [FastTrack Bark summary](/data/html/dev/swedia-formants-2026/Analyses/Axis_band_pair_midpoints_fasttrack_bark/regional_pair_midpoint_summary.png)
+- [Praat-fixed Bark summary](/data/html/dev/swedia-formants-2026/Analyses/Axis_band_pair_midpoints_praat-fixed_bark/regional_pair_midpoint_summary.png)
+
+The `/uː–oː/` ordering is monotonic in all three methods, although PCA runs in the opposite numerical direction from the two formant analyses because of its learned orientation. Praat and FastTrack also agree on a monotonic `/yː–ʉ̟ː/` pattern. For most other pairs, Central is not intermediate, which confirms that the more complicated regional structure persists under this grouping.
+
+The band width can be tested with, for example:
+
+```bash
+--central-margin 25
+```
+
+or:
+
+```bash
+--central-margin 50
+```</pre>
+    </section>
     </section>
   </main>
   <script>
