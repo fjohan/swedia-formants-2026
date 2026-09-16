@@ -19,9 +19,9 @@ from matplotlib.colors import Normalize
 import numpy as np
 
 from model_vowel_axis_trajectories import (
-    DEFAULT_EXCLUDED_REGIONS, fit_response, geographic_axis, spline_basis,
+    DEFAULT_EXCLUDED_REGIONS, FILE_LABELS, fit_response, geographic_axis, spline_basis,
 )
-from plot_midpoint_vowel_spaces import VOWELS, read_tokens, speaker_vowels
+from plot_midpoint_vowel_spaces import PAIRS, VOWELS, read_tokens, speaker_vowels
 from plot_regional_pair_midpoint_summary import ALIASES, resource_provinces
 
 
@@ -301,8 +301,10 @@ def main() -> int:
                         default="pca")
     parser.add_argument("--bark", action="store_true",
                         help="Use Bark F1/F2 with Praat or FastTrack; PCA is unchanged.")
-    parser.add_argument("--first", choices=VOWELS, default="uː")
-    parser.add_argument("--second", choices=VOWELS, default="oː")
+    parser.add_argument("--first", choices=VOWELS,
+                        help="First vowel for a single-pair run; omit with --second to run all six pairs.")
+    parser.add_argument("--second", choices=VOWELS,
+                        help="Second vowel for a single-pair run; omit with --first to run all six pairs.")
     parser.add_argument("--include-incomplete", action="store_true")
     parser.add_argument("--include-reference", action="store_true")
     parser.add_argument("--coordinate", choices=("axis", "raw-y"), default="axis")
@@ -315,7 +317,9 @@ def main() -> int:
     parser.add_argument("--include-finland-gotland", action="store_true")
     parser.add_argument("--output-dir", type=Path)
     args = parser.parse_args()
-    if args.first == args.second:
+    if (args.first is None) != (args.second is None):
+        parser.error("--first and --second must be supplied together")
+    if args.first is not None and args.first == args.second:
         parser.error("--first and --second must differ")
     if args.central_margin < 0:
         parser.error("--central-margin must be non-negative")
@@ -340,59 +344,22 @@ def main() -> int:
     for row in positions:
         row["geo_position"] = geography["positions"][row["village"]]
         row["geographic_group"] = geography["groups"].get(row["village"], "")
-    paired = paired_speakers(positions, args.first, args.second)
-    for row in paired:
-        row["geo_position"] = geography["positions"][row["village"]]
-        row["geographic_group"] = geography["groups"].get(row["village"], "")
-    villages = village_pairs(paired)
-    geo_position = np.asarray([row["geo_position"] for row in villages])
-    knots = np.quantile(geo_position, [0, .25, .75, 1])
-    grid = np.linspace(geo_position.min(), geo_position.max(), 180)
-    first_curve = fit_trajectory(villages, ("first_x", "first_y"), grid, knots)
-    second_curve = fit_trajectory(villages, ("second_x", "second_y"), grid, knots)
-
-    if args.partition == "band":
-        marker_positions = []
-        for label, marker in (("North", "^"), ("Centre", "o"), ("South", "s")):
-            values = [row["geo_position"] for row in villages
-                      if row["geographic_group"] == label]
-            if values:
-                marker_positions.append((float(np.median(values)), label, marker))
-    else:
-        proportions = ((.1, "South", "s"), (.5, "Centre", "o"), (.9, "North", "^"))
-        if not geography["increases_north"]:
-            proportions = ((.1, "North", "^"), (.5, "Centre", "o"), (.9, "South", "s"))
-        marker_positions = [(float(np.quantile(geo_position, proportion)), label, marker)
-                            for proportion, label, marker in proportions]
     coordinate_label = (f"position on {args.south_endpoint} → {args.north_endpoint} axis"
                         if args.coordinate == "axis" else "geographic y")
     space = "pca" if args.method == "pca" else "bark" if args.bark else "hz"
-    pair_label = f"{VOWELS.index(args.first)+1}_{VOWELS.index(args.second)+1}"
     output_label = args.method if args.method == "pca" else f"{args.method}_{space}"
     geography_label = ("axis_band" if args.coordinate == "axis" and args.partition == "band"
                        else f"{args.coordinate}_{args.partition}")
-    output = args.output_dir or Path(
-        f"Analyses/Pair_trajectory_{output_label}_{pair_label}_{geography_label}"
-    )
+    selected_pairs = ((args.first, args.second),) if args.first is not None else PAIRS
+    output = args.output_dir or Path(f"Analyses/Pair_axis_trajectories_{output_label}_{geography_label}")
     output.mkdir(parents=True, exist_ok=True)
-    write_csv(output / "speaker_pair_angles.csv", paired)
-    write_csv(output / "village_pair_positions.csv", villages)
-    fitted, village_geometry, spline_models, geometry_models = plot(
-        output / "pair_trajectories_angles_distances.png", paired, villages,
-        first_curve, second_curve, grid, args.first, args.second, args.method, space,
-        marker_positions, coordinate_label, geography["increases_north"],
-    )
-    write_csv(output / "fitted_pair_summary.csv", fitted)
-    write_csv(output / "village_pair_geometry.csv", village_geometry)
-    write_csv(output / "pair_geometry_spline_models.csv", spline_models)
-    write_csv(output / "pair_geometry_predictive_models.csv", geometry_models)
     write_csv(output / "excluded_villages.csv", [
         {"village": village, "region": provinces[ALIASES.get(village, village)]}
         for village in excluded_villages
     ])
     settings = {
         "input": str(args.input), "method": args.method, "space": space,
-        "first": args.first, "second": args.second,
+        "pairs": selected_pairs,
         "coordinate": args.coordinate, "partition": args.partition,
         "south_endpoint": args.south_endpoint, "north_endpoint": args.north_endpoint,
         "central_villages": args.central_villages, "central_margin": args.central_margin,
@@ -405,7 +372,56 @@ def main() -> int:
     (output / "settings.json").write_text(
         json.dumps(settings, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
-    print(f"Wrote {len(paired)} speaker pairs across {len(villages)} villages to {output}")
+    combined_spline_models, combined_geometry_models = [], []
+    for first, second in selected_pairs:
+        paired = paired_speakers(positions, first, second)
+        for row in paired:
+            row["geo_position"] = geography["positions"][row["village"]]
+            row["geographic_group"] = geography["groups"].get(row["village"], "")
+        villages = village_pairs(paired)
+        geo_position = np.asarray([row["geo_position"] for row in villages])
+        knots = np.quantile(geo_position, [0, .25, .75, 1])
+        grid = np.linspace(geo_position.min(), geo_position.max(), 180)
+        first_curve = fit_trajectory(villages, ("first_x", "first_y"), grid, knots)
+        second_curve = fit_trajectory(villages, ("second_x", "second_y"), grid, knots)
+        if args.partition == "band":
+            marker_positions = []
+            for label, marker in (("North", "^"), ("Centre", "o"), ("South", "s")):
+                values = [row["geo_position"] for row in villages
+                          if row["geographic_group"] == label]
+                if values:
+                    marker_positions.append((float(np.median(values)), label, marker))
+        else:
+            proportions = ((.1, "South", "s"), (.5, "Centre", "o"), (.9, "North", "^"))
+            if not geography["increases_north"]:
+                proportions = ((.1, "North", "^"), (.5, "Centre", "o"), (.9, "South", "s"))
+            marker_positions = [(float(np.quantile(geo_position, proportion)), label, marker)
+                                for proportion, label, marker in proportions]
+        pair_label = (f"{VOWELS.index(first)+1}_{VOWELS.index(second)+1}_"
+                      f"{FILE_LABELS[first]}_{FILE_LABELS[second]}")
+        pair_output = output if len(selected_pairs) == 1 else output / pair_label
+        pair_output.mkdir(parents=True, exist_ok=True)
+        write_csv(pair_output / "speaker_pair_angles.csv", paired)
+        write_csv(pair_output / "village_pair_positions.csv", villages)
+        fitted, village_geometry, spline_models, geometry_models = plot(
+            pair_output / "pair_trajectories_angles_distances.png", paired, villages,
+            first_curve, second_curve, grid, first, second, args.method, space,
+            marker_positions, coordinate_label, geography["increases_north"],
+        )
+        for rows in (fitted, village_geometry, spline_models, geometry_models):
+            for row in rows:
+                row.update({"pair": f"{first}->{second}",
+                            "first_vowel": first, "second_vowel": second})
+        write_csv(pair_output / "fitted_pair_summary.csv", fitted)
+        write_csv(pair_output / "village_pair_geometry.csv", village_geometry)
+        write_csv(pair_output / "pair_geometry_spline_models.csv", spline_models)
+        write_csv(pair_output / "pair_geometry_predictive_models.csv", geometry_models)
+        combined_spline_models.extend(spline_models)
+        combined_geometry_models.extend(geometry_models)
+        print(f"  /{first}/ -> /{second}/: {len(paired)} speakers, {len(villages)} villages")
+    write_csv(output / "all_pair_spline_models.csv", combined_spline_models)
+    write_csv(output / "all_pair_predictive_models.csv", combined_geometry_models)
+    print(f"Wrote {len(selected_pairs)} pair analyses to {output}")
     return 0
 
 

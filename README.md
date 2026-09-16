@@ -30,7 +30,7 @@ Audio recordings are stored in `Media/` and `sounds/`, annotations in `TextGrids
 
 ### Modelling paired PCA trajectories
 
-`Scripts/plot_pair_axis_trajectories.py` overlays the geographic-axis trajectories of any two vowel targets and draws the connecting vector for every speaker. It supports PCA, fixed Praat, and FastTrack measurements and models how pair angle and acoustic distance vary geographically. Its default geography uses the Löderup–Arjeplog axis, a Tjällmo–Rimforsa central band, and excludes Gotland and Finland; the original raw north–south coordinate remains available. The default vowel comparison is `/uː/` to `/oː/`.
+`Scripts/plot_pair_axis_trajectories.py` overlays geographic-axis trajectories for vowel pairs and draws the connecting vector for every speaker. By default, it runs all six canonical directed pairs; `--first` and `--second` select a single alternative pair. It supports PCA, fixed Praat, and FastTrack measurements and models how pair angle and acoustic distance vary geographically. Its default geography uses the Löderup–Arjeplog axis, a Tjällmo–Rimforsa central band, and excludes Gotland and Finland; the original raw north–south coordinate remains available.
 
 ## Analysing directed vowel pairs
 

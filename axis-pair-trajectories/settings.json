@@ -2,8 +2,32 @@
   "input": "formants-all.csv",
   "method": "pca",
   "space": "pca",
-  "first": "uː",
-  "second": "oː",
+  "pairs": [
+    [
+      "uː",
+      "oː"
+    ],
+    [
+      "oː",
+      "ɑː"
+    ],
+    [
+      "ɑː",
+      "æː"
+    ],
+    [
+      "æː",
+      "eː"
+    ],
+    [
+      "yː",
+      "ʉ̟ː"
+    ],
+    [
+      "ʉ̟ː",
+      "øː"
+    ]
+  ],
   "coordinate": "axis",
   "partition": "band",
   "south_endpoint": "loderup",
