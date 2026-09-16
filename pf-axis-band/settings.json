@@ -1,10 +1,10 @@
 {
   "input": "formants-all.csv",
   "method": "praat-fixed",
-  "space": "hz",
+  "space": "bark",
   "measurement_columns": [
-    "f2_50",
-    "f1_50"
+    "bark_f2_50",
+    "bark_f1_50"
   ],
   "grouping": "axis-band",
   "group_order": [
