@@ -26,7 +26,7 @@ Audio recordings are stored in `Media/` and `sounds/`, annotations in `TextGrids
 
 ## Modelling vowel trajectories across geography
 
-`Scripts/model_vowel_north_south_trajectories.py` models each vowel's curved path through two-dimensional acoustic space as geographic north–south position changes. Separate coordinated spline models are fitted to the two acoustic dimensions using village-level vowel positions, while individual speakers remain visible in the plots. It supports fixed Praat, FastTrack, and PCA measurements and exports model statistics, fitted positions, and bootstrap uncertainty.
+`Scripts/model_vowel_north_south_trajectories.py` models each vowel's curved path through two-dimensional acoustic space as geographic north–south position changes. By default, position is projected onto the Löderup–Arjeplog axis, Tjällmo and Rimforsa define a central geographic band, and Gotland and Finland are excluded. The axis, partitioning, and exclusions are configurable, and the original raw-coordinate behavior remains available. Separate coordinated spline models are fitted to the two acoustic dimensions using village-level vowel positions, while individual speakers remain visible in the plots. It supports fixed Praat, FastTrack, and PCA measurements and exports model statistics, fitted positions, and bootstrap uncertainty.
 
 ## Analysing directed vowel pairs
 

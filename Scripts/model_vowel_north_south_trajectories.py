@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import math
 import os
 from pathlib import Path
@@ -19,12 +20,63 @@ import numpy as np
 from scipy.stats import f as f_distribution
 
 from plot_midpoint_vowel_spaces import VOWELS, read_tokens, speaker_vowels
+from plot_regional_pair_midpoint_summary import ALIASES, resource_provinces
 
 
 FILE_LABELS = {
     "uː": "u", "oː": "o", "ɑː": "open_back_a", "æː": "ae",
     "eː": "e", "yː": "y", "ʉ̟ː": "central_u", "øː": "oe",
 }
+DEFAULT_EXCLUDED_REGIONS = {"Gotland", "Åboland", "Nyland", "Österbotten", "Åland"}
+
+
+def geographic_axis(speakers: list[dict], south_name: str, north_name: str,
+                    central_names: list[str], margin: float,
+                    coordinate_mode: str, partition: str) -> dict:
+    grouped = {}
+    for row in speakers:
+        grouped.setdefault(row["village"], []).append((row["geo_x"], row["geo_y"]))
+    coordinates = {name: np.median(np.asarray(values), axis=0)
+                   for name, values in grouped.items()}
+    required = ([south_name, north_name, *central_names]
+                if coordinate_mode == "axis" or partition == "band" else [])
+    missing = [name for name in required if name not in coordinates]
+    if missing:
+        raise ValueError("Geographic reference villages absent: " + ", ".join(missing))
+
+    if coordinate_mode == "axis":
+        south, north = coordinates[south_name], coordinates[north_name]
+        vector = north - south
+        axis_length = float(np.linalg.norm(vector))
+        unit = vector / axis_length
+        positions = {name: float((point - south) @ unit)
+                     for name, point in coordinates.items()}
+        increases_north = True
+    else:
+        south = north = unit = None
+        axis_length = math.nan
+        positions = {name: float(point[1]) for name, point in coordinates.items()}
+        increases_north = False
+
+    if partition == "band":
+        central = [positions[name] for name in central_names]
+        lower, upper = min(central) - margin, max(central) + margin
+        if increases_north:
+            groups = {name: "South" if value < lower else "North" if value > upper else "Centre"
+                      for name, value in positions.items()}
+        else:
+            groups = {name: "North" if value < lower else "South" if value > upper else "Centre"
+                      for name, value in positions.items()}
+    else:
+        lower = upper = math.nan
+        groups = {}
+
+    return {
+        "coordinates": coordinates, "positions": positions, "groups": groups,
+        "increases_north": increases_north, "south": south, "north": north,
+        "unit": unit, "axis_length": axis_length,
+        "central_lower": lower, "central_upper": upper,
+    }
 
 
 def village_vowels(speakers: list[dict]) -> list[dict]:
@@ -127,13 +179,19 @@ def write_csv(path: Path, rows: list[dict]) -> None:
 
 def plot_vowel(path: Path, vowel: str, speakers: list[dict], villages: list[dict],
                grid: np.ndarray, predicted: np.ndarray, bootstrap: np.ndarray,
-               models: dict[str, dict], method: str, space: str) -> None:
+               models: dict[str, dict], method: str, space: str,
+               marker_positions: list[tuple[float, str, str]],
+               coordinate_label: str, increases_north: bool) -> None:
     fig, ax = plt.subplots(figsize=(8, 7), constrained_layout=True)
     speaker_x = np.asarray([row["display_x"] for row in speakers])
     speaker_y = np.asarray([row["display_y"] for row in speakers])
-    speaker_geo = np.asarray([row["geo_y"] for row in speakers])
+    speaker_geo = np.asarray([row["geo_position"] for row in speakers])
     norm = Normalize(grid.min(), grid.max())
-    scatter = ax.scatter(speaker_x, speaker_y, c=speaker_geo, cmap="coolwarm_r",
+    # coolwarm_r maps low values to red and high values to blue.  Reverse it
+    # for legacy raw-y coordinates, where low values are northern.
+    cmap_name = "coolwarm_r" if increases_north else "coolwarm"
+    cmap = plt.get_cmap(cmap_name)
+    scatter = ax.scatter(speaker_x, speaker_y, c=speaker_geo, cmap=cmap_name,
                          norm=norm, s=22, alpha=.38, edgecolors="none", zorder=1)
     ax.scatter([row["display_x"] for row in villages],
                [row["display_y"] for row in villages],
@@ -141,18 +199,19 @@ def plot_vowel(path: Path, vowel: str, speakers: list[dict], villages: list[dict
                label="village medians", zorder=3)
 
     segments = np.stack([predicted[:-1], predicted[1:]], axis=1)
-    collection = LineCollection(segments, cmap="coolwarm_r", norm=norm,
+    collection = LineCollection(segments, cmap=cmap_name, norm=norm,
                                 linewidth=4, zorder=4)
     collection.set_array((grid[:-1] + grid[1:]) / 2)
     ax.add_collection(collection)
-    for proportion, marker, label in ((.1, "^", "North"), (.5, "o", "Centre"),
-                                       (.9, "s", "South")):
-        index = round(proportion * (len(grid) - 1))
+    for position, label, marker in marker_positions:
+        index = int(np.argmin(np.abs(grid - position)))
         confidence_ellipse(ax, bootstrap[:, index, :])
-        ax.scatter(*predicted[index], marker=marker, color=plt.get_cmap("coolwarm_r")(proportion),
+        ax.scatter(*predicted[index], marker=marker, color=cmap(norm(grid[index])),
                    edgecolor="#111", s=85, zorder=6, label=label)
-    arrow_index = round(.70 * (len(grid) - 1))
-    ax.annotate("", xy=predicted[arrow_index + 2], xytext=predicted[arrow_index - 2],
+    arrow_index = round(.70 * (len(grid) - 1)) if increases_north else round(.30 * (len(grid) - 1))
+    arrow_step = 2 if increases_north else -2
+    ax.annotate("", xy=predicted[arrow_index + arrow_step],
+                xytext=predicted[arrow_index - arrow_step],
                 arrowprops={"arrowstyle": "->", "color": "#111", "lw": 2}, zorder=7)
 
     if method == "pca":
@@ -171,11 +230,11 @@ def plot_vowel(path: Path, vowel: str, speakers: list[dict], villages: list[dict
     ax.text(.02, .02, stats_text, transform=ax.transAxes, va="bottom", fontsize=8,
             bbox={"facecolor": "white", "alpha": .9, "edgecolor": "#aaa"})
     ax.set(xlabel=xlabel, ylabel=ylabel,
-           title=f"/{vowel}/: fitted north-to-south acoustic trajectory\n"
+           title=f"/{vowel}/: fitted south-to-north acoustic trajectory\n"
                  f"{len(speakers)} speakers, {len(villages)} villages")
     ax.set_aspect("equal", adjustable="datalim"); ax.grid(alpha=.18)
     ax.legend(loc="best", fontsize=8)
-    fig.colorbar(scatter, ax=ax, label="geographic y (north → south)")
+    fig.colorbar(scatter, ax=ax, label=coordinate_label)
     fig.savefig(path, dpi=180)
     plt.close(fig)
 
@@ -189,6 +248,17 @@ def main() -> int:
                         help="Use Bark F1/F2 for Praat or FastTrack; PCA is unchanged.")
     parser.add_argument("--include-incomplete", action="store_true")
     parser.add_argument("--include-reference", action="store_true")
+    parser.add_argument("--coordinate", choices=("axis", "raw-y"), default="axis",
+                        help="Continuous geographic predictor; raw-y reproduces the old model.")
+    parser.add_argument("--south-endpoint", default="loderup")
+    parser.add_argument("--north-endpoint", default="arjeplog")
+    parser.add_argument("--partition", choices=("band", "proportional"), default="band",
+                        help="Band uses geographic groups; proportional uses old 10/50/90%% markers.")
+    parser.add_argument("--central-villages", nargs="+", default=["tjallmo", "rimforsa"])
+    parser.add_argument("--central-margin", type=float, default=35.0)
+    parser.add_argument("--resource", type=Path, default=Path("resource.txt"))
+    parser.add_argument("--include-finland-gotland", action="store_true",
+                        help="Retain Gotland and the four Finland regions; excluded by default.")
     parser.add_argument("--vowels", nargs="+", choices=VOWELS, default=list(VOWELS))
     parser.add_argument("--bootstrap", type=int, default=500)
     parser.add_argument("--seed", type=int, default=20260915)
@@ -196,22 +266,46 @@ def main() -> int:
     args = parser.parse_args()
     if args.bootstrap < 20:
         parser.error("--bootstrap must be at least 20")
+    if args.central_margin < 0:
+        parser.error("--central-margin must be non-negative")
 
     tokens = read_tokens(args.input, args.method, args.include_incomplete, args.bark)
     if not args.include_reference:
         tokens = [row for row in tokens if row["village"] != "ref"]
+    provinces = resource_provinces(args.resource)
+    excluded_villages = sorted({
+        row["village"] for row in tokens
+        if not args.include_finland_gotland
+        and provinces.get(ALIASES.get(row["village"], row["village"]))
+        in DEFAULT_EXCLUDED_REGIONS
+    })
+    tokens = [row for row in tokens if row["village"] not in excluded_villages]
     speakers = speaker_vowels(tokens)
+    geography = geographic_axis(
+        speakers, args.south_endpoint, args.north_endpoint,
+        args.central_villages, args.central_margin,
+        args.coordinate, args.partition,
+    )
+    for row in speakers:
+        row["geo_position"] = geography["positions"][row["village"]]
+        row["geographic_group"] = geography["groups"].get(row["village"], "")
     villages = village_vowels(speakers)
+    for row in villages:
+        row["geo_position"] = geography["positions"][row["village"]]
+        row["geographic_group"] = geography["groups"].get(row["village"], "")
     space = "pca" if args.method == "pca" else "bark" if args.bark else "hz"
     output_label = args.method if args.method == "pca" else f"{args.method}_{space}"
-    output = args.output_dir or Path(f"Analyses/Vowel_NS_trajectories_{output_label}")
+    geography_label = "axis_band" if args.coordinate == "axis" and args.partition == "band" else f"{args.coordinate}_{args.partition}"
+    output = args.output_dir or Path(
+        f"Analyses/Vowel_NS_trajectories_{output_label}_{geography_label}"
+    )
     output.mkdir(parents=True, exist_ok=True)
     statistics_rows, prediction_rows = [], []
 
     for vowel_index, vowel in enumerate(args.vowels):
         speaker_subset = [row for row in speakers if row["vowel"] == vowel]
         village_subset = [row for row in villages if row["vowel"] == vowel]
-        x = np.asarray([row["geo_y"] for row in village_subset], dtype=float)
+        x = np.asarray([row["geo_position"] for row in village_subset], dtype=float)
         responses = np.asarray([[row["display_x"], row["display_y"]]
                                 for row in village_subset], dtype=float)
         if len(x) < 8 or len(np.unique(x)) < 4:
@@ -234,7 +328,8 @@ def main() -> int:
                 "overall_f": model["overall_f"], "overall_p": model["overall_p"],
                 "nonlinearity_f": model["nonlinearity_f"],
                 "nonlinearity_p": model["nonlinearity_p"],
-                "knots_geo_y": ";".join(f"{value:.6g}" for value in knots),
+                "geographic_coordinate": args.coordinate,
+                "knots_geographic_position": ";".join(f"{value:.6g}" for value in knots),
                 **{f"coefficient_{index}": float(value)
                    for index, value in enumerate(model["coefficients"])},
             })
@@ -243,10 +338,11 @@ def main() -> int:
             np.random.default_rng(args.seed + vowel_index),
         )
         lower, upper = np.percentile(bootstrap, [2.5, 97.5], axis=0)
-        for index, geo_y in enumerate(grid):
+        for index, geo_position in enumerate(grid):
             prediction_rows.append({
                 "method": args.method, "space": space, "vowel": vowel,
-                "geo_y": geo_y,
+                "geographic_coordinate": args.coordinate,
+                "geographic_position": geo_position,
                 "predicted_display_x": predicted[index, 0],
                 "predicted_display_y": predicted[index, 1],
                 "display_x_lower_95": lower[index, 0],
@@ -255,13 +351,62 @@ def main() -> int:
                 "display_y_upper_95": upper[index, 1],
             })
         filename = f"{VOWELS.index(vowel) + 1:02d}_{FILE_LABELS[vowel]}_trajectory.png"
+        if args.partition == "band":
+            marker_positions = []
+            for label, marker in (("North", "^"), ("Centre", "o"), ("South", "s")):
+                values = [row["geo_position"] for row in village_subset
+                          if row["geographic_group"] == label]
+                if values:
+                    marker_positions.append((float(np.median(values)), label, marker))
+        else:
+            proportions = ((.1, "South", "s"), (.5, "Centre", "o"), (.9, "North", "^"))
+            if not geography["increases_north"]:
+                proportions = ((.1, "North", "^"), (.5, "Centre", "o"), (.9, "South", "s"))
+            marker_positions = [(float(np.quantile(x, proportion)), label, marker)
+                                for proportion, label, marker in proportions]
+        coordinate_label = (f"position on {args.south_endpoint} → {args.north_endpoint} axis "
+                            "(south red → north blue)" if args.coordinate == "axis"
+                            else "geographic y (north blue → south red)")
         plot_vowel(output / filename, vowel, speaker_subset, village_subset,
-                   grid, predicted, bootstrap, models, args.method, space)
+                   grid, predicted, bootstrap, models, args.method, space,
+                   marker_positions, coordinate_label, geography["increases_north"])
 
     write_csv(output / "village_vowel_positions.csv",
               [row for row in villages if row["vowel"] in args.vowels])
     write_csv(output / "trajectory_model_statistics.csv", statistics_rows)
     write_csv(output / "trajectory_predictions.csv", prediction_rows)
+    write_csv(output / "excluded_villages.csv", [
+        {"village": village,
+         "region": provinces[ALIASES.get(village, village)]}
+        for village in excluded_villages
+    ])
+    group_counts = {
+        group: len({(row["village"], row["speaker"]) for row in speakers
+                    if row["geographic_group"] == group})
+        for group in ("North", "Centre", "South")
+    }
+    settings = {
+        "input": str(args.input), "method": args.method, "space": space,
+        "coordinate": args.coordinate, "partition": args.partition,
+        "south_endpoint": args.south_endpoint, "north_endpoint": args.north_endpoint,
+        "central_villages": args.central_villages,
+        "central_margin": args.central_margin,
+        "central_band": [geography["central_lower"], geography["central_upper"]],
+        "axis_length": geography["axis_length"],
+        "axis_south_coordinates": (None if geography["south"] is None
+                                   else geography["south"].tolist()),
+        "axis_north_coordinates": (None if geography["north"] is None
+                                   else geography["north"].tolist()),
+        "group_speaker_counts": group_counts,
+        "include_incomplete": args.include_incomplete,
+        "excluded_regions": ([] if args.include_finland_gotland
+                             else sorted(DEFAULT_EXCLUDED_REGIONS)),
+        "excluded_villages": excluded_villages,
+        "colors": "red south, blue north",
+    }
+    (output / "settings.json").write_text(
+        json.dumps(settings, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
     print(f"Wrote {len(statistics_rows) // 2} vowel models to {output}")
     return 0
 
