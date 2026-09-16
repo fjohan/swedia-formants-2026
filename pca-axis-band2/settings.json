@@ -1,0 +1,68 @@
+{
+  "input": "formants-all.csv",
+  "method": "pca",
+  "space": "pca",
+  "pairs": [
+    [
+      "uː",
+      "oː"
+    ],
+    [
+      "oː",
+      "ɑː"
+    ],
+    [
+      "ɑː",
+      "æː"
+    ],
+    [
+      "æː",
+      "eː"
+    ],
+    [
+      "yː",
+      "ʉ̟ː"
+    ],
+    [
+      "ʉ̟ː",
+      "øː"
+    ]
+  ],
+  "coordinate": "axis",
+  "partition": "band",
+  "south_endpoint": "loderup",
+  "north_endpoint": "arjeplog",
+  "central_villages": [
+    "tjallmo",
+    "rimforsa"
+  ],
+  "central_margin": 35.0,
+  "central_band": [
+    75.59203999318285,
+    165.2582039594654
+  ],
+  "excluded_regions": [
+    "Gotland",
+    "Nyland",
+    "Åboland",
+    "Åland",
+    "Österbotten"
+  ],
+  "excluded_villages": [
+    "borga",
+    "brando",
+    "dragsfjard",
+    "faro",
+    "fole",
+    "houtskar",
+    "kyrkslatt",
+    "munsala",
+    "narpes",
+    "saltvik",
+    "sproge",
+    "vora"
+  ],
+  "colors": "red south, blue north",
+  "bootstrap_iterations": 500,
+  "seed": 20260916
+}
