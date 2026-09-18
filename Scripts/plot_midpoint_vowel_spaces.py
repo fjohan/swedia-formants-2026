@@ -25,6 +25,9 @@ METHOD_COLUMNS = {
     "praat-fixed": ("f2_50", "f1_50"),
     "fasttrack": ("ft_f2_50", "ft_f1_50"),
     "pca": ("pca_pc1_50", "pca_pc2_50"),
+    "pca-speaker-z": ("pca_speaker_z_pc1_50", "pca_speaker_z_pc2_50"),
+    "praat-lobanov": ("praat_lobanov_f2_50", "praat_lobanov_f1_50"),
+    "fasttrack-lobanov": ("fasttrack_lobanov_f2_50", "fasttrack_lobanov_f1_50"),
 }
 COLORS = dict(zip(VOWELS, plt.get_cmap("tab10").colors))
 
@@ -35,18 +38,22 @@ def finite_median(values) -> float:
     return float(np.median(values)) if len(values) else math.nan
 
 
-def method_columns(method: str, bark: bool) -> tuple[str, str]:
+def method_columns(method: str, bark: bool, timepoint: int = 50) -> tuple[str, str]:
+    if timepoint not in {20, 50, 80}:
+        raise ValueError("timepoint must be 20, 50, or 80")
     if bark and method == "praat-fixed":
-        return "bark_f2_50", "bark_f1_50"
+        return f"bark_f2_{timepoint}", f"bark_f1_{timepoint}"
     if bark and method == "fasttrack":
-        return "ft_bark_f2_50", "ft_bark_f1_50"
-    return METHOD_COLUMNS[method]
+        return f"ft_bark_f2_{timepoint}", f"ft_bark_f1_{timepoint}"
+    return tuple(f"{column.rsplit('_', 1)[0]}_{timepoint}"
+                 for column in METHOD_COLUMNS[method])
 
 
-def read_tokens(path: Path, method: str, include_incomplete: bool, bark: bool) -> list[dict]:
+def read_tokens(path: Path, method: str, include_incomplete: bool, bark: bool,
+                timepoint: int = 50) -> list[dict]:
     with path.open(encoding="utf-8", newline="") as handle:
         rows = list(csv.DictReader(handle))
-    x_column, y_column = method_columns(method, bark)
+    x_column, y_column = method_columns(method, bark, timepoint)
     required = {"village", "speaker", "vowel", "geo_x", "geo_y", x_column, y_column}
     if not include_incomplete:
         required.add("complete")
@@ -276,6 +283,8 @@ def main() -> int:
         "--bark", action="store_true",
         help="Use Bark F1/F2 for Praat or FastTrack; PCA is unchanged.",
     )
+    parser.add_argument("--timepoint", type=int, choices=(20, 50, 80), default=50,
+                        help="Percent of vowel duration to analyze (default: 50).")
     parser.add_argument("--group-by", choices=("village", "speaker"), default="village")
     parser.add_argument("--include-incomplete", action="store_true")
     parser.add_argument("--plot", action="store_true")
@@ -285,12 +294,15 @@ def main() -> int:
     if args.groups_per_page < 1:
         parser.error("--groups-per-page must be positive")
     space_suffix = "_bark" if args.bark and args.method != "pca" else ""
+    timepoint_suffix = f"_t{args.timepoint}" if args.timepoint != 50 else ""
     output = args.output_dir or Path(
-        f"Analyses/Midpoint_vowel_spaces_{args.method}{space_suffix}_{args.group_by}"
+        f"Analyses/Midpoint_vowel_spaces_{args.method}{space_suffix}"
+        f"{timepoint_suffix}_{args.group_by}"
     )
     output.mkdir(parents=True, exist_ok=True)
 
-    tokens = read_tokens(args.input, args.method, args.include_incomplete, args.bark)
+    tokens = read_tokens(args.input, args.method, args.include_incomplete, args.bark,
+                         args.timepoint)
     speaker_rows = speaker_vowels(tokens)
     positions = aggregate(speaker_rows, args.group_by)
     midpoints, angles = analyze(positions, args.method, args.group_by)

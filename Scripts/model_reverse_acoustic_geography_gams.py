@@ -26,7 +26,12 @@ from plot_regional_pair_midpoint_summary import ALIASES, resource_provinces
 
 
 METHOD_LABELS = {
-    "pca": "spectral PCA", "praat-fixed": "fixed-Praat formants",
+    "pca": "spectral PCA", "pca-speaker-z": "speaker-standardized spectral PCA",
+    "praat-lobanov": "Lobanov-normalized fixed-Praat formants",
+    "fasttrack-lobanov": "Lobanov-normalized FastTrack formants",
+    "praat-bark": "Bark-transformed fixed-Praat formants",
+    "fasttrack-bark": "Bark-transformed FastTrack formants",
+    "praat-fixed": "fixed-Praat formants",
     "fasttrack": "FastTrack formants",
 }
 
@@ -38,7 +43,8 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--output", type=Path,
                         default=Path("Analyses/Reverse_acoustic_geography_GAMs"))
     parser.add_argument("--methods", nargs="+",
-                        choices=("pca", "praat-fixed", "fasttrack"),
+                        choices=("pca", "pca-speaker-z", "praat-fixed", "fasttrack",
+                                 "praat-lobanov", "fasttrack-lobanov"),
                         default=["pca", "praat-fixed", "fasttrack"])
     parser.add_argument("--targets", choices=("individual", "pairs", "whole-space", "all"),
                         default="all")
@@ -107,12 +113,20 @@ def target_data(
 def response_spec(name: str, values: np.ndarray) -> dict:
     if name == "geo-x":
         return {"column": 0, "label": "geo_x", "cmap": "viridis",
-                "low": "Low geo_x", "high": "High geo_x"}
+                "colorbar_label": "East–west location"}
     if name == "geo-y":
         return {"column": 1, "label": "geo_y", "cmap": "coolwarm",
-                "low": "Low geo_y · north", "high": "High geo_y · south"}
+                "colorbar_label": "North–south location"}
     return {"column": 2, "label": "Löderup–Arjeplog axis", "cmap": "coolwarm_r",
-            "low": "Löderup · south", "high": "Arjeplog · north"}
+            "colorbar_label": "Löderup–Arjeplog position"}
+
+
+def display_target(target_type: str, target: str) -> str:
+    if target_type == "vowel":
+        return f"/{target}/"
+    if target_type == "shared_pair_space" and "+" in target:
+        return " + ".join(f"/{vowel}/" for vowel in target.split("+"))
+    return target
 
 
 def permutation_p(
@@ -146,9 +160,14 @@ def grouped_cv(
 
 
 def acoustic_labels(method: str) -> tuple[str, str]:
-    return ("−PC1 (score dB)", "−PC2 (score dB)") if method == "pca" else (
-        "−F2 (Hz)", "−F1 (Hz)"
-    )
+    if method in {"pca", "pca-speaker-z"}:
+        unit = "score dB" if method == "pca" else "speaker z"
+        return f"−PC1 ({unit})", f"−PC2 ({unit})"
+    if method in {"praat-lobanov", "fasttrack-lobanov"}:
+        return "−F2 (speaker z)", "−F1 (speaker z)"
+    if method in {"praat-bark", "fasttrack-bark"}:
+        return "−F2 (Bark)", "−F1 (Bark)"
+    return "−F2 (Hz)", "−F1 (Hz)"
 
 
 def write_csv(path: Path, rows: list[dict]) -> None:
@@ -205,7 +224,7 @@ def analyze_target(
                        cmap=spec["cmap"], vmin=village_response.min(),
                        vmax=village_response.max(), marker=markers[vowel_index], s=29,
                        edgecolors="white", linewidths=.35,
-                       label=(rows[vowel_index * len(village_response)]["vowel"]
+                       label=(f'/{rows[vowel_index * len(village_response)]["vowel"]}/'
                               if len(supports) > 1 else None))
         ax.set(xlabel=x_label, ylabel=y_label,
                title=f'Fitted {spec["label"]}\nCV R²={cv_r2:.2f}, permutation p={p_value:.4g}')
@@ -213,8 +232,7 @@ def analyze_target(
         if len(supports) > 1:
             ax.legend(title="vowel", fontsize=8, ncol=2 if len(supports) > 2 else 1)
         colorbar = fig.colorbar(contour, ax=ax, shrink=.78)
-        colorbar.set_ticks([village_response.min(), village_response.max()])
-        colorbar.set_ticklabels([spec["low"], spec["high"]])
+        colorbar.set_label(spec["colorbar_label"], rotation=90, labelpad=18)
         summaries.append({
             "method": method, "target_type": target_type, "target": target,
             "geographic_response": response_name,
@@ -226,7 +244,9 @@ def analyze_target(
             "permutation_p": p_value, "rss_improvement": statistic,
             "directory": str(output),
         })
-    fig.suptitle(f"{target}: geography projected over {METHOD_LABELS[method]} space")
+    fig.suptitle(
+        f"{display_target(target_type, target)}: geography projected over {METHOD_LABELS[method]} space"
+    )
     fig.savefig(output / "reverse_geography_surfaces.png", dpi=180)
     plt.close(fig)
 

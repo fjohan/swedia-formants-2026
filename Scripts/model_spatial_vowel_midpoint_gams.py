@@ -13,6 +13,8 @@ from pathlib import Path
 os.environ.setdefault("MPLCONFIGDIR", "/tmp/swedia-spatial-vowels-matplotlib")
 
 import matplotlib.pyplot as plt
+from matplotlib.collections import LineCollection
+from matplotlib.colors import Normalize
 from matplotlib.path import Path as PlotPath
 import numpy as np
 from scipy.spatial import ConvexHull
@@ -27,6 +29,11 @@ from plot_regional_pair_midpoint_summary import ALIASES, resource_provinces
 
 METHOD_LABELS = {
     "pca": "spectral PCA",
+    "pca-speaker-z": "speaker-standardized spectral PCA",
+    "praat-lobanov": "Lobanov-normalized fixed-Praat formants",
+    "fasttrack-lobanov": "Lobanov-normalized FastTrack formants",
+    "praat-bark": "Bark-transformed fixed-Praat formants",
+    "fasttrack-bark": "Bark-transformed FastTrack formants",
     "praat-fixed": "fixed-Praat formants",
     "fasttrack": "FastTrack formants",
 }
@@ -39,7 +46,8 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--output", type=Path,
                         default=Path("Analyses/Spatial_vowel_midpoint_GAMs"))
     parser.add_argument("--methods", nargs="+",
-                        choices=("pca", "praat-fixed", "fasttrack"),
+                        choices=("pca", "pca-speaker-z", "praat-fixed", "fasttrack",
+                                 "praat-lobanov", "fasttrack-lobanov"),
                         default=["pca", "praat-fixed", "fasttrack"])
     parser.add_argument("--targets", choices=("individual", "midpoints", "all"),
                         default="all")
@@ -107,9 +115,18 @@ def midpoint_rows(speakers: list[dict], first: str, second: str) -> list[dict]:
 
 
 def labels_for(method: str) -> tuple[str, str]:
-    if method == "pca":
-        return "−PC1 (score dB)", "−PC2 (score dB)"
+    if method in {"pca", "pca-speaker-z"}:
+        unit = "score dB" if method == "pca" else "speaker z"
+        return f"−PC1 ({unit})", f"−PC2 ({unit})"
+    if method in {"praat-lobanov", "fasttrack-lobanov"}:
+        return "−F2 (speaker z)", "−F1 (speaker z)"
+    if method in {"praat-bark", "fasttrack-bark"}:
+        return "−F2 (Bark)", "−F1 (Bark)"
     return "−F2 (Hz)", "−F1 (Hz)"
+
+
+def display_target(target: str) -> str:
+    return target if target.startswith("/") and target.endswith("/") else f"/{target}/"
 
 
 def analyze_target(
@@ -147,8 +164,9 @@ def analyze_target(
     } for point, prediction, keep in zip(grid, grid_predictions, supported) if keep])
 
     x_label, y_label = labels_for(method)
-    coordinate_names = (x_label.replace(" (score dB)", "").replace(" (Hz)", ""),
-                        y_label.replace(" (score dB)", "").replace(" (Hz)", ""))
+    coordinate_names = tuple(
+        label.split(" (")[0] for label in (x_label, y_label)
+    )
     fig, axes = plt.subplots(1, 2, figsize=(12, 8), sharex=True, sharey=True,
                              constrained_layout=True)
     for coordinate, ax in enumerate(axes):
@@ -159,10 +177,14 @@ def analyze_target(
         ax.set_aspect("equal", adjustable="box")
         ax.set(xlabel="geo_x", title=f"Fitted {coordinate_names[coordinate]}")
         fig.colorbar(contour, ax=ax, shrink=.68,
-                     label="PCA score dB" if method == "pca" else "Hz")
+                     label=("PCA score dB" if method == "pca" else
+                            "speaker z" if method in {"pca-speaker-z", "praat-lobanov",
+                                                       "fasttrack-lobanov"} else
+                            "Bark" if method in {"praat-bark", "fasttrack-bark"} else "Hz"))
     axes[0].set_ylabel("geo_y (larger values downward)")
     axes[0].invert_yaxis()
-    fig.suptitle(f"{target}: continuous spatial GAM — {METHOD_LABELS[method]}")
+    shown_target = display_target(target)
+    fig.suptitle(f"{shown_target}: continuous spatial GAM — {METHOD_LABELS[method]}")
     fig.savefig(output / "geographic_surfaces.png", dpi=180)
     plt.close(fig)
 
@@ -177,11 +199,60 @@ def analyze_target(
         ax.plot([observed[0], prediction[0]], [observed[1], prediction[1]],
                 color="0.45", lw=.4, alpha=.22)
     ax.set(xlabel=x_label, ylabel=y_label,
-           title=f"{target}: observed and spatially fitted values")
+           title=f"{shown_target}: observed and spatially fitted values")
     ax.set_aspect("equal", adjustable="datalim"); ax.grid(alpha=.15); ax.legend()
     colorbar = fig.colorbar(fitted_scatter, ax=ax, shrink=.78)
     colorbar.set_label("geo_y (north/blue → south/red)")
     fig.savefig(output / "fitted_acoustic_space.png", dpi=180)
+    plt.close(fig)
+
+    # Transform the fitted geographic grid into acoustic space. Constant-geo_x
+    # curves trace north-south movement; constant-geo_y curves show the
+    # orthogonal spatial deformation. This retains the full 2-D GAM while
+    # making curved acoustic trajectories visible.
+    predicted_mesh = grid_predictions.reshape(grid_size, grid_size, 2)
+    supported_mesh = supported.reshape(grid_size, grid_size)
+    fig, ax = plt.subplots(figsize=(9, 8), constrained_layout=True)
+    y_norm = Normalize(float(gy.min()), float(gy.max()))
+    y_cmap = plt.get_cmap("coolwarm")  # low geo_y/north blue; high/south red
+    selected_x = np.unique(np.linspace(0, grid_size - 1, 9).round().astype(int))
+    median_x_index = int(np.argmin(np.abs(gx - np.median(X[:, 0]))))
+    if median_x_index not in selected_x:
+        selected_x = np.sort(np.append(selected_x, median_x_index))
+    for x_index in selected_x:
+        curve = predicted_mesh[:, x_index, :].copy()
+        curve[~supported_mesh[:, x_index]] = np.nan
+        valid_pairs = np.isfinite(curve[:-1, 0]) & np.isfinite(curve[1:, 0])
+        segments = np.stack([curve[:-1], curve[1:]], axis=1)[valid_pairs]
+        if len(segments):
+            collection = LineCollection(
+                segments, cmap=y_cmap, norm=y_norm,
+                linewidths=3.0 if x_index == median_x_index else 1.05,
+                alpha=.95 if x_index == median_x_index else .48,
+                zorder=2,
+            )
+            collection.set_array(((gy[:-1] + gy[1:]) / 2)[valid_pairs])
+            ax.add_collection(collection)
+    selected_y = np.unique(np.linspace(0, grid_size - 1, 9).round().astype(int))
+    for y_index in selected_y:
+        curve = predicted_mesh[y_index, :, :].copy()
+        curve[~supported_mesh[y_index]] = np.nan
+        ax.plot(curve[:, 0], curve[:, 1], color="0.22", lw=.65,
+                ls=":", alpha=.42, zorder=1)
+    ax.scatter(responses[:, 0], responses[:, 1], s=22, color="0.72", alpha=.42,
+               label="observed village value", zorder=3)
+    fitted_scatter = ax.scatter(
+        fitted[:, 0], fitted[:, 1], s=34, c=X[:, 1], cmap=y_cmap,
+        norm=y_norm, edgecolor="white", linewidth=.4,
+        label="spatial-GAM fitted value", zorder=4,
+    )
+    ax.set(xlabel=x_label, ylabel=y_label,
+           title=f"{shown_target}: geographic grid transformed into acoustic space\n"
+                 "solid curves vary geo_y; dotted curves vary geo_x")
+    ax.set_aspect("equal", adjustable="datalim"); ax.grid(alpha=.12); ax.legend()
+    colorbar = fig.colorbar(fitted_scatter, ax=ax, shrink=.78)
+    colorbar.set_label("geo_y (north/blue → south/red)")
+    fig.savefig(output / "gam_geographic_mesh_in_acoustic_space.png", dpi=180)
     plt.close(fig)
 
     summary = {
@@ -196,6 +267,31 @@ def analyze_target(
         "directory": str(output),
     }
     write_csv(output / "model_statistics.csv", [summary])
+    (output / "index.html").write_text(f"""<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><title>{shown_target}: spatial acoustic GAM</title><style>
+body{{font:16px/1.55 system-ui;max-width:1050px;margin:2rem auto;padding:0 1rem}}
+img{{max-width:100%;height:auto}}code{{background:#eee;padding:.1rem .25rem}}</style></head><body>
+<h1>{shown_target}: continuous spatial GAM — {METHOD_LABELS[method]}</h1>
+<p>Village-balanced {target_type} coordinates are modeled separately as joint smooths of
+<code>geo_x</code> and <code>geo_y</code>. The joint spatial association has permutation
+p={joint_p:.4g}. Coordinate 1 has R²={explained[0]:.2f}, CV R²={cv_r2[0]:.2f},
+p={p_values[0]:.4g}; coordinate 2 has R²={explained[1]:.2f}, CV R²={cv_r2[1]:.2f},
+p={p_values[1]:.4g}.</p>
+<h2>Acoustic coordinates over geographic space</h2>
+<figure><img src="geographic_surfaces.png" alt="Fitted geographic surfaces"></figure>
+<h2>Observed and fitted acoustic positions</h2>
+<figure><img src="fitted_acoustic_space.png" alt="Observed and fitted acoustic positions"></figure>
+<h2>The fitted geographic mesh in acoustic space</h2>
+<p>The GAM predicts an acoustic position throughout the supported geographic plane. Mapping that
+grid into acoustic space produces a deformation mesh: solid colored curves hold <code>geo_x</code>
+constant and move from north (blue) to south (red), while dotted curves hold <code>geo_y</code>
+constant and move across <code>geo_x</code>. The thicker solid curve is nearest the median
+<code>geo_x</code>. Curvature in these lines is a direct description of the fitted spatial GAM,
+rather than a North/Centre/South grouping.</p>
+<figure><img src="gam_geographic_mesh_in_acoustic_space.png" alt="GAM geographic mesh transformed into acoustic space"></figure>
+<p><a href="model_statistics.csv">Statistics</a> ·
+<a href="village_predictions.csv">Village predictions</a> ·
+<a href="surface.csv">Continuous surface</a></p></body></html>""", encoding="utf-8")
     return summary
 
 
@@ -252,7 +348,7 @@ def main() -> int:
         f'<td>{row["target"]}</td><td>{row["x_explained_deviance"]:.2f}</td>'
         f'<td>{row["x_cv_r2_10fold"]:.2f}</td><td>{row["y_explained_deviance"]:.2f}</td>'
         f'<td>{row["y_cv_r2_10fold"]:.2f}</td><td>{row["joint_permutation_p"]:.4g}</td>'
-        f'<td><a href="{Path(row["directory"]).relative_to(args.output)}/geographic_surfaces.png">maps</a></td></tr>'
+        f'<td><a href="{Path(row["directory"]).relative_to(args.output)}/index.html">report</a></td></tr>'
         for row in summaries
     )
     (args.output / "index.html").write_text(f"""<!doctype html><html lang="en"><head>
@@ -266,7 +362,7 @@ two acoustic coordinates, village-level permutation tests, and 10-fold village c
 PCA and formant coordinates have different scales and meanings, so compare geographic structure,
 explained deviance, and predictive performance rather than raw effect magnitudes.</p>
 <table><thead><tr><th>Method</th><th>Type</th><th>Target</th><th>X R²</th><th>X CV R²</th>
-<th>Y R²</th><th>Y CV R²</th><th>Joint p</th><th>Figures</th></tr></thead><tbody>
+<th>Y R²</th><th>Y CV R²</th><th>Joint p</th><th>Report</th></tr></thead><tbody>
 {rows_html}</tbody></table><p><a href="all_model_statistics.csv">All statistics</a> ·
 <a href="settings.json">Settings</a></p></body></html>""", encoding="utf-8")
     print(f"Wrote {len(summaries)} analyses to {args.output}")

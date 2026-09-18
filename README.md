@@ -40,75 +40,10 @@ Audio recordings are stored in `Media/` and `sounds/`, annotations in `TextGrids
 
 `Scripts/plot_regional_pair_midpoint_summary.py` provides a compact regional view of vowel-pair midpoints. Its default geography uses the Löderup–Arjeplog axis, the Tjällmo–Rimforsa central band, and excludes Gotland and Finland. Midpoints are calculated within speakers, aggregated within villages, and then summarized across villages; the plot distinguishes their true two-dimensional positions from projections onto the corpus pair axes and shows village-bootstrap uncertainty. Equal-sized groups, traditional lands, and the earlier centroid-based midpoint calculation remain available as legacy options. Arrows identify pairs with a monotonic ordering across the three groups.
 
+## Building focused vowel-pair GAM reports
+
+`Scripts/build_vowel_pair_gam_report.py` builds a self-contained spatial-GAM report for any directed vowel pair. It supports PCA, fixed-Praat, and FastTrack acoustic spaces; optional Bark transformation for the formant methods; and measurements at 20%, 50%, or 80% of vowel duration. The report combines individual-vowel surfaces, geography projected over acoustic space, fitted pair vectors, and continuously fitted pair midpoints. Results are written to a method-specific directory under `Analyses/`.
+
 ---
 
-## Spatial GAM analyses of vowels and vowel-pair midpoints
-
-The following scripts provide complementary directions of spatial modelling. Both use village-balanced acoustic positions, two-dimensional tensor-product smooths, village-level permutation tests, and 10-fold cross-validation. Gotland and the Finnish regions are excluded by default. Geographic plots follow the source-map orientation, with larger `geo_y` values displayed farther down.
-
-### Predicting acoustic position from geography
-
-`Scripts/model_spatial_vowel_midpoint_gams.py` models each acoustic coordinate from the joint geographic plane:
-
-```text
-acoustic coordinate 1 ~ s(geo_x, geo_y)
-acoustic coordinate 2 ~ s(geo_x, geo_y)
-```
-
-It can analyze all eight individual vowels and all six canonical paired-speaker vowel midpoints using spectral PCA, fixed-Praat formants, or FastTrack formants. For individual vowels, speaker measurements are aggregated to village medians. For midpoints, the two vowels are first paired within speakers and then aggregated within villages. Each target receives two geographic effect maps, an observed-versus-fitted acoustic-space plot, coordinate-wise and joint permutation tests, cross-validated R² values, village predictions, and a downloadable continuous surface.
-
-The default command runs every method, vowel, and midpoint:
-
-```bash
-swedia-pca/bin/python Scripts/model_spatial_vowel_midpoint_gams.py
-```
-
-The scope can be reduced when developing or checking a particular comparison:
-
-```bash
-swedia-pca/bin/python Scripts/model_spatial_vowel_midpoint_gams.py \
-  --methods pca fasttrack \
-  --targets midpoints \
-  --pairs 'uː,oː'
-```
-
-Default results are written to `Analyses/Spatial_vowel_midpoint_GAMs/`. The top-level `index.html` and `all_model_statistics.csv` compare the same spatial analysis across acoustic representations and targets.
-
-### Projecting geography over acoustic space
-
-`Scripts/model_reverse_acoustic_geography_gams.py` reverses the conditional direction. Acoustic coordinates form the two-dimensional predictor map, and one geographic coordinate is projected over it:
-
-```text
-geographic response ~ s(acoustic coordinate 1, acoustic coordinate 2)
-```
-
-The available geographic responses are `geo-x`, `geo-y`, and `axis`, where `axis` is position on the Löderup–Arjeplog line. The script supports three acoustic-map scopes:
-
-- `individual`: one map for each vowel;
-- `pairs`: both vowels occupy one shared acoustic plane, with paired village observations kept together during testing and validation;
-- `whole-space`: all selected vowels occupy one shared acoustic plane.
-
-Vowel identity controls marker shape in shared maps but is not included as a model predictor. The plotted surface is restricted to the union of vowel-specific observed acoustic regions to reduce unsupported interpolation between vowel clouds.
-
-The default command runs `geo_x` and `geo_y` projections for every method and all three scopes:
-
-```bash
-swedia-pca/bin/python Scripts/model_reverse_acoustic_geography_gams.py
-```
-
-Examples of narrower runs are:
-
-```bash
-# All vowels together in PCA space, with geo_x and geo_y overlays
-swedia-pca/bin/python Scripts/model_reverse_acoustic_geography_gams.py \
-  --methods pca \
-  --targets whole-space
-
-# Shared /uː/–/oː/ spaces with the Löderup–Arjeplog coordinate overlaid
-swedia-pca/bin/python Scripts/model_reverse_acoustic_geography_gams.py \
-  --targets pairs \
-  --pairs 'uː,oː' \
-  --geographic-responses axis
-```
-
-Default results are written to `Analyses/Reverse_acoustic_geography_GAMs/`. Because this direction is predictive, the cross-validated R² should be considered alongside the permutation p-value: a visually smooth or statistically detectable surface may still generalize poorly to villages left out during fitting.
+Detailed commands, modelling directions, normalization variants, and output descriptions are in [Spatial GAM analyses](SPATIAL_GAM_ANALYSES.md).
